@@ -1,5 +1,3 @@
-import { Message } from "ai";
-
 export interface Citation {
   url: string;
   content: string;
@@ -8,6 +6,13 @@ export interface Citation {
 
 export interface ChatStreamData {
   citations?: Citation[];
+}
+
+// Simple message type for chat functionality
+export interface Message {
+  role: 'user' | 'assistant' | 'system';
+  content: string;
+  id?: string;
 }
 
 export interface ChatRequest {

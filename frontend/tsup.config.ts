@@ -15,5 +15,8 @@ export default defineConfig({
     'https',
     'http',
     'zod',
+    '@ai-sdk/groq', // AI SDK for Groq
+    'ai', // Vercel AI SDK
+    'js-tiktoken', // Token counting library
   ],
 });

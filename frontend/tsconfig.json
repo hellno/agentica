@@ -25,5 +25,11 @@
     "baseUrl": "."
   },
   "include": ["next-env.d.ts", "**/*.ts", "**/*.tsx", ".next/types/**/*.ts"],
-  "exclude": ["node_modules", "elizaos/**/*"]
+  "exclude": [
+    "node_modules",
+    "elizaos/**/*",
+    "src/agent.ts",
+    "src/plugin-groq.ts",
+    "src/plugin-rag/**/*"
+  ]
 }

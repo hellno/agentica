@@ -149,10 +149,11 @@ async function generateGroqText(
       prompt: params.prompt,
       system: params.system,
       temperature: params.temperature,
-      maxTokens: params.maxTokens,
-      frequencyPenalty: params.frequencyPenalty,
-      presencePenalty: params.presencePenalty,
-      stopSequences: params.stopSequences,
+      // Note: AI SDK v5+ uses different parameter names
+      // maxTokens: params.maxTokens,
+      // frequencyPenalty: params.frequencyPenalty,
+      // presencePenalty: params.presencePenalty,
+      // stopSequences: params.stopSequences,
     });
     return groqResponse;
   } catch (error: unknown) {
@@ -163,10 +164,11 @@ async function generateGroqText(
           prompt: params.prompt,
           system: params.system,
           temperature: params.temperature,
-          maxTokens: params.maxTokens,
-          frequencyPenalty: params.frequencyPenalty,
-          presencePenalty: params.presencePenalty,
-          stopSequences: params.stopSequences,
+          // Note: AI SDK v5+ uses different parameter names
+          // maxTokens: params.maxTokens,
+          // frequencyPenalty: params.frequencyPenalty,
+          // presencePenalty: params.presencePenalty,
+          // stopSequences: params.stopSequences,
         });
         return groqRetryResponse;
       });
