@@ -1,0 +1,36 @@
+# AI Agent Launchpad - Python Dependencies
+# These packages are automatically installed by Modal in the container images
+# This file is for reference and local development
+
+# Modal platform
+modal>=0.63.0
+
+# Web framework
+fastapi>=0.104.0
+
+# HTTP client
+requests>=2.31.0
+
+# Database
+supabase>=2.0.0
+
+# CDP SDK for Server Wallet v2
+cdp-sdk>=0.11.0
+
+# Web3 for blockchain interactions (used with CDP SDK)
+web3>=6.0.0
+
+# Environment variables
+python-dotenv>=1.0.0
+
+# OpenAI API for strategy generation
+openai>=1.0.0
+
+# Standard library (no install needed)
+# - subprocess
+# - pathlib
+# - os
+# - json
+# - re
+# - time
+# - typing
