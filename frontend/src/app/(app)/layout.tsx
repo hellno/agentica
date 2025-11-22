@@ -1,3 +1,5 @@
+import { Header } from "@/components/header";
+
 export default function Layout({
   children,
 }: Readonly<{
@@ -5,7 +7,10 @@ export default function Layout({
 }>) {
   return (
     <div className="flex min-h-dvh flex-col size-full shrink-0 relative overflow-hidden">
-      {children}
+      <Header />
+      <div className="pt-14">
+        {children}
+      </div>
     </div>
   );
 }
