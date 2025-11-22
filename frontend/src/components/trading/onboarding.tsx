@@ -2,6 +2,8 @@
 
 import React, { useState } from 'react';
 import { Bot, Shield, Zap, ArrowRight, Smartphone, Mail } from 'lucide-react';
+import { AuthButton } from '@coinbase/cdp-react/components/AuthButton';
+import { useIsSignedIn, useEvmAddress } from '@coinbase/cdp-hooks';
 import { Preferences, RiskLevel, Strategy } from '@/types/trading';
 
 interface OnboardingProps {
@@ -17,6 +19,17 @@ const Onboarding: React.FC<OnboardingProps> = ({ onComplete }) => {
     maxInvestmentPerTrade: 50,
   });
 
+  const { isSignedIn } = useIsSignedIn();
+  const { evmAddress } = useEvmAddress();
+
+  // Auto-advance to next step when user signs in
+  React.useEffect(() => {
+    if (step === 0 && isSignedIn && evmAddress) {
+      console.log('[Onboarding] User signed in, advancing to next step');
+      setStep(1);
+    }
+  }, [step, isSignedIn, evmAddress]);
+
   const nextStep = () => setStep(s => s + 1);
 
   const Step0_SignIn = () => (
@@ -29,16 +42,26 @@ const Onboarding: React.FC<OnboardingProps> = ({ onComplete }) => {
         <p className="text-slate-500">Let&apos;s get you started with automated AI trading.</p>
       </div>
 
-      <div className="w-full max-w-sm space-y-3">
-        <button onClick={nextStep} className="w-full flex items-center justify-center gap-3 p-3 bg-white border border-slate-200 rounded-xl hover:bg-slate-50 transition-all font-medium text-slate-700">
-          <span className="text-xl">G</span> Sign in with Google
-        </button>
-        <button onClick={nextStep} className="w-full flex items-center justify-center gap-3 p-3 bg-black text-white rounded-xl hover:bg-slate-800 transition-all font-medium">
-           Sign in with Apple
-        </button>
-        <button onClick={nextStep} className="w-full flex items-center justify-center gap-3 p-3 bg-indigo-600 text-white rounded-xl hover:bg-indigo-700 transition-all font-medium shadow-lg shadow-indigo-200">
-           <Mail className="w-5 h-5" /> Email Sign-In
-        </button>
+      <div className="w-full max-w-sm flex justify-center">
+        {isSignedIn && evmAddress ? (
+          <div className="flex flex-col items-center gap-4 p-6 bg-green-50 border border-green-200 rounded-xl w-full">
+            <div className="flex items-center gap-3">
+              <div className="w-12 h-12 bg-green-600 rounded-full flex items-center justify-center">
+                <Bot className="w-6 h-6 text-white" />
+              </div>
+              <div>
+                <p className="text-sm font-semibold text-green-900">Wallet Connected!</p>
+                <p className="text-xs text-green-600 font-mono">
+                  {evmAddress.slice(0, 6)}...{evmAddress.slice(-4)}
+                </p>
+              </div>
+            </div>
+          </div>
+        ) : (
+          <div className="w-full">
+            <AuthButton />
+          </div>
+        )}
       </div>
     </div>
   );

@@ -1,5 +1,10 @@
 {
   "devDependencies": {
     "shadcn": "^3.5.0"
+  },
+  "dependencies": {
+    "@coinbase/cdp-core": "^0.0.67",
+    "@coinbase/cdp-hooks": "^0.0.67",
+    "@coinbase/cdp-react": "^0.0.67"
   }
 }

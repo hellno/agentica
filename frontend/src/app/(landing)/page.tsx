@@ -9,9 +9,151 @@ import ActivityFeed from '@/components/trading/activity-feed';
 import TradeModal from '@/components/trading/trade-modal';
 import { Preferences, PortfolioState, Trade, Thought } from '@/types/trading';
 import { INITIAL_ASSETS, INITIAL_CASH, MOCK_NEWS, DEFAULT_PREFERENCES } from '@/lib/trading-constants';
-import { Bell, Menu, Settings, Sliders } from 'lucide-react';
+import { Bell, Menu, Settings, Sliders, LogOut, Wallet } from 'lucide-react';
+import { CDPReactProvider } from "@coinbase/cdp-react";
+import { useEvmAddress, useCurrentUser, useSignOut } from '@coinbase/cdp-hooks';
+
+// Separate component for dashboard that uses CDP hooks
+function TradingDashboard({
+  preferences,
+  setPreferences,
+  portfolio,
+  setPortfolio,
+  thoughts,
+  trades,
+  isTradeModalOpen,
+  setIsTradeModalOpen,
+  executingTradeId,
+  executeTrade
+}: any) {
+  const { evmAddress } = useEvmAddress();
+  const { signOut } = useSignOut();
+
+  return (
+    <div className="min-h-screen bg-slate-50 text-slate-900 font-sans pb-20 md:pb-0">
+      {/* Header */}
+      <header className="bg-white border-b border-slate-200 sticky top-0 z-30">
+        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 h-16 flex items-center justify-between">
+          <div className="flex items-center gap-2">
+             <div className="w-8 h-8 bg-indigo-600 rounded-lg flex items-center justify-center">
+                <span className="text-white font-bold">A</span>
+             </div>
+             <span className="text-xl font-bold tracking-tight text-slate-900">Agentica</span>
+          </div>
+          <div className="flex items-center gap-4">
+             <button onClick={() => setIsTradeModalOpen(true)} className="hidden md:block px-4 py-2 bg-slate-900 text-white text-sm font-medium rounded-lg hover:bg-slate-800 transition-colors">
+                Manual Trade
+             </button>
+             <button className="p-2 hover:bg-slate-100 rounded-full relative">
+                <Bell className="w-5 h-5 text-slate-600" />
+                <span className="absolute top-2 right-2 w-2 h-2 bg-red-500 rounded-full border border-white"></span>
+             </button>
+
+             {/* User Profile Section */}
+             {evmAddress && (
+               <div className="flex items-center gap-2 pl-4 border-l border-slate-200">
+                 <div className="hidden md:flex items-center gap-3 px-3 py-2 bg-slate-50 rounded-lg">
+                   <div className="w-8 h-8 bg-indigo-600 rounded-full flex items-center justify-center">
+                     <Wallet className="w-4 h-4 text-white" />
+                   </div>
+                   <div className="flex flex-col">
+                     <span className="text-xs text-slate-500">Wallet</span>
+                     <span className="text-sm font-mono font-semibold text-slate-900">
+                       {evmAddress.slice(0, 6)}...{evmAddress.slice(-4)}
+                     </span>
+                   </div>
+                 </div>
+                 <button
+                   onClick={() => signOut()}
+                   className="p-2 hover:bg-red-50 rounded-full text-slate-600 hover:text-red-600 transition-colors"
+                   title="Sign Out"
+                 >
+                   <LogOut className="w-5 h-5" />
+                 </button>
+               </div>
+             )}
+          </div>
+        </div>
+      </header>
+
+      <main className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
+        <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
+
+          {/* Left Column: News & Portfolio */}
+          <div className="lg:col-span-2 space-y-8">
+             <NewsFeed news={MOCK_NEWS} />
+             <Portfolio data={portfolio} />
+             <div className="block lg:hidden">
+               <ThoughtProcess thoughts={thoughts} />
+             </div>
+             <ActivityFeed trades={trades} />
+          </div>
+
+          {/* Right Column: AI Brain (Sticky on Desktop) */}
+          <div className="hidden lg:block lg:col-span-1">
+            <div className="sticky top-24 space-y-8">
+              <ThoughtProcess thoughts={thoughts} />
+
+              {/* Quick Actions Card */}
+              <div className="bg-white rounded-2xl p-6 shadow-sm border border-slate-100">
+                 <h3 className="font-semibold text-slate-900 mb-4 flex items-center gap-2">
+                    <Sliders className="w-4 h-4" /> Agent Controls
+                 </h3>
+                 <div className="space-y-4">
+                    <div className="flex justify-between text-sm">
+                       <span className="text-slate-500">Mode</span>
+                       <span className="font-medium text-indigo-600">{preferences.strategy}</span>
+                    </div>
+                    <div className="flex justify-between text-sm">
+                       <span className="text-slate-500">Risk</span>
+                       <span className="font-medium text-amber-500">{preferences.riskLevel}</span>
+                    </div>
+                    <button
+                      onClick={() => setIsTradeModalOpen(true)}
+                      className="w-full py-3 mt-2 border border-slate-200 rounded-xl text-sm font-semibold text-slate-700 hover:bg-slate-50 transition-colors"
+                    >
+                       Override Agent
+                    </button>
+                 </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </main>
+
+      {/* Execution Spinner Overlay */}
+      {executingTradeId && (
+        <div className="fixed inset-0 bg-white/80 backdrop-blur-sm z-50 flex items-center justify-center">
+          <div className="text-center">
+            <div className="w-16 h-16 border-4 border-indigo-200 border-t-indigo-600 rounded-full animate-spin mx-auto mb-4"></div>
+            <h3 className="text-xl font-bold text-slate-900">Executing Trade...</h3>
+            <p className="text-slate-500">Interacting with exchange</p>
+          </div>
+        </div>
+      )}
+
+      {/* Mobile Floating Action Button */}
+      <div className="fixed bottom-6 right-6 lg:hidden">
+         <button
+          onClick={() => setIsTradeModalOpen(true)}
+          className="w-14 h-14 bg-indigo-600 rounded-full shadow-xl shadow-indigo-300 flex items-center justify-center text-white"
+         >
+            <Menu className="w-6 h-6" />
+         </button>
+      </div>
+
+      <TradeModal
+        isOpen={isTradeModalOpen}
+        onClose={() => setIsTradeModalOpen(false)}
+        onConfirm={(asset, amount, type) => executeTrade(asset, amount, type)}
+        assets={portfolio.assets}
+      />
+    </div>
+  );
+}
 
 export default function Page() {
+
   const [isOnboarded, setIsOnboarded] = useState(false);
   const [preferences, setPreferences] = useState<Preferences>(DEFAULT_PREFERENCES);
 
@@ -123,107 +265,43 @@ export default function Page() {
   }, [isOnboarded]);
 
   if (!isOnboarded) {
-    return <Onboarding onComplete={(prefs) => { setPreferences(prefs); setIsOnboarded(true); }} />;
+    return (
+      <CDPReactProvider
+        config={{
+          projectId: process.env.NEXT_PUBLIC_CDP_PROJECT_ID || '',
+          appName: 'Agentica',
+          ethereum: {
+            createOnLogin: 'smart',
+          },
+        }}
+      >
+        <Onboarding onComplete={(prefs) => { setPreferences(prefs); setIsOnboarded(true); }} />
+      </CDPReactProvider>
+    );
   }
 
   return (
-    <div className="min-h-screen bg-slate-50 text-slate-900 font-sans pb-20 md:pb-0">
-      {/* Header */}
-      <header className="bg-white border-b border-slate-200 sticky top-0 z-30">
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 h-16 flex items-center justify-between">
-          <div className="flex items-center gap-2">
-             <div className="w-8 h-8 bg-indigo-600 rounded-lg flex items-center justify-center">
-                <span className="text-white font-bold">A</span>
-             </div>
-             <span className="text-xl font-bold tracking-tight text-slate-900">Agentica</span>
-          </div>
-          <div className="flex items-center gap-4">
-             <button onClick={() => setIsTradeModalOpen(true)} className="hidden md:block px-4 py-2 bg-slate-900 text-white text-sm font-medium rounded-lg hover:bg-slate-800 transition-colors">
-                Manual Trade
-             </button>
-             <button className="p-2 hover:bg-slate-100 rounded-full relative">
-                <Bell className="w-5 h-5 text-slate-600" />
-                <span className="absolute top-2 right-2 w-2 h-2 bg-red-500 rounded-full border border-white"></span>
-             </button>
-             <button className="p-2 hover:bg-slate-100 rounded-full">
-                <Settings className="w-5 h-5 text-slate-600" />
-             </button>
-          </div>
-        </div>
-      </header>
-
-      <main className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
-        <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
-
-          {/* Left Column: News & Portfolio */}
-          <div className="lg:col-span-2 space-y-8">
-             <NewsFeed news={MOCK_NEWS} />
-             <Portfolio data={portfolio} />
-             <div className="block lg:hidden">
-               <ThoughtProcess thoughts={thoughts} />
-             </div>
-             <ActivityFeed trades={trades} />
-          </div>
-
-          {/* Right Column: AI Brain (Sticky on Desktop) */}
-          <div className="hidden lg:block lg:col-span-1">
-            <div className="sticky top-24 space-y-8">
-              <ThoughtProcess thoughts={thoughts} />
-
-              {/* Quick Actions Card */}
-              <div className="bg-white rounded-2xl p-6 shadow-sm border border-slate-100">
-                 <h3 className="font-semibold text-slate-900 mb-4 flex items-center gap-2">
-                    <Sliders className="w-4 h-4" /> Agent Controls
-                 </h3>
-                 <div className="space-y-4">
-                    <div className="flex justify-between text-sm">
-                       <span className="text-slate-500">Mode</span>
-                       <span className="font-medium text-indigo-600">{preferences.strategy}</span>
-                    </div>
-                    <div className="flex justify-between text-sm">
-                       <span className="text-slate-500">Risk</span>
-                       <span className="font-medium text-amber-500">{preferences.riskLevel}</span>
-                    </div>
-                    <button
-                      onClick={() => setIsTradeModalOpen(true)}
-                      className="w-full py-3 mt-2 border border-slate-200 rounded-xl text-sm font-semibold text-slate-700 hover:bg-slate-50 transition-colors"
-                    >
-                       Override Agent
-                    </button>
-                 </div>
-              </div>
-            </div>
-          </div>
-        </div>
-      </main>
-
-      {/* Execution Spinner Overlay */}
-      {executingTradeId && (
-        <div className="fixed inset-0 bg-white/80 backdrop-blur-sm z-50 flex items-center justify-center">
-          <div className="text-center">
-            <div className="w-16 h-16 border-4 border-indigo-200 border-t-indigo-600 rounded-full animate-spin mx-auto mb-4"></div>
-            <h3 className="text-xl font-bold text-slate-900">Executing Trade...</h3>
-            <p className="text-slate-500">Interacting with exchange</p>
-          </div>
-        </div>
-      )}
-
-      {/* Mobile Floating Action Button */}
-      <div className="fixed bottom-6 right-6 lg:hidden">
-         <button
-          onClick={() => setIsTradeModalOpen(true)}
-          className="w-14 h-14 bg-indigo-600 rounded-full shadow-xl shadow-indigo-300 flex items-center justify-center text-white"
-         >
-            <Menu className="w-6 h-6" />
-         </button>
-      </div>
-
-      <TradeModal
-        isOpen={isTradeModalOpen}
-        onClose={() => setIsTradeModalOpen(false)}
-        onConfirm={(asset, amount, type) => executeTrade(asset, amount, type)}
-        assets={portfolio.assets}
+    <CDPReactProvider
+      config={{
+        projectId: process.env.NEXT_PUBLIC_CDP_PROJECT_ID || '',
+        appName: 'Agentica',
+        ethereum: {
+          createOnLogin: 'smart',
+        },
+      }}
+    >
+      <TradingDashboard
+        preferences={preferences}
+        setPreferences={setPreferences}
+        portfolio={portfolio}
+        setPortfolio={setPortfolio}
+        thoughts={thoughts}
+        trades={trades}
+        isTradeModalOpen={isTradeModalOpen}
+        setIsTradeModalOpen={setIsTradeModalOpen}
+        executingTradeId={executingTradeId}
+        executeTrade={executeTrade}
       />
-    </div>
+    </CDPReactProvider>
   );
 }

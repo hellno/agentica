@@ -26,6 +26,10 @@ const nextConfig: NextConfig = {
       ...config,
       resolve: {
         ...config.resolve,
+        alias: {
+          ...config.resolve?.alias,
+          'x402-fetch': 'cross-fetch',
+        },
         fallback: {
           ...config.resolve?.fallback,
           fs: false,
