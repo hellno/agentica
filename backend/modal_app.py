@@ -1123,27 +1123,16 @@ Keep it concise and actionable. Automatically include these guardrails:
         except Exception as e:
             print(f"Warning: Failed to start agent {strategy_agent_id}: {str(e)}")
 
-        # Step 5: Create ElizaOS room with strategy agent (and optional additional agents)
-        print(f"Creating ElizaOS room")
+        # Step 5: Create ElizaOS room for the strategy agent
+        # Correct endpoint: POST /api/agents/{agentId}/rooms (not /api/rooms)
+        print(f"Creating ElizaOS room for agent {eliza_agent_id}")
         eliza_room_id = None
         try:
-            # Combine strategy agent with additional agents
-            all_eliza_agent_ids = [strategy_agent_id]
-
-            # If additional agent_ids provided, get their eliza_agent_ids
-            if additional_agent_ids:
-                supabase = create_supabase_client()
-                result = supabase.table("platform_agents").select("eliza_agent_id").in_(
-                    "id", additional_agent_ids
-                ).execute()
-                all_eliza_agent_ids.extend([agent["eliza_agent_id"] for agent in (result.data or [])])
-
-            # Create room in ElizaOS
-            create_room_url = get_eliza_api_url("/api/rooms")
+            # Create room FOR the strategy agent using correct ElizaOS API
+            create_room_url = get_eliza_api_url(f"/api/agents/{eliza_agent_id}/rooms")
             room_payload = {
                 "name": name,
-                "description": description or f"Portfolio room with AI strategy: {name}",
-                "agentIds": all_eliza_agent_ids,
+                "roomId": room_id,  # Use our platform room_id as the ElizaOS room ID
             }
 
             room_response = requests.post(
@@ -1157,12 +1146,12 @@ Keep it concise and actionable. Automatically include these guardrails:
                 raise Exception(f"ElizaOS room creation error: {room_response.status_code} - {room_response.text}")
 
             room_data = room_response.json()
-            eliza_room_id = (
-                room_data.get("id") or
-                room_data.get("roomId") or
-                room_data.get("data", {}).get("id") or
-                room_data.get("data", {}).get("roomId")
-            )
+
+            # ElizaOS returns: {"success": true, "data": {"id": "...", "name": "...", ...}}
+            if not room_data.get("success"):
+                raise Exception(f"ElizaOS room creation failed: {room_data.get('error', {}).get('message', 'Unknown error')}")
+
+            eliza_room_id = room_data.get("data", {}).get("id")
 
             if not eliza_room_id:
                 raise Exception(f"ElizaOS did not return room ID. Response: {room_data}")
@@ -1414,45 +1403,43 @@ Keep it concise and actionable. Automatically include these guardrails:
                 detail=f"Failed to query user agents: {str(e)}"
             )
 
-        # Query ElizaOS for rooms
-        # ASSUMPTION: ElizaOS has a GET /api/rooms endpoint
-        # This might need to be adjusted based on actual ElizaOS API
+        # Query ElizaOS for rooms for each user agent
+        # Correct pattern: GET /api/agents/{agentId}/rooms (rooms are scoped to agents)
         try:
-            list_url = get_eliza_api_url("/api/rooms")
-
-            list_response = requests.get(
-                list_url,
-                timeout=30
-            )
-
-            if not list_response.ok:
-                print(f"ElizaOS room listing failed: {list_response.status_code} - {list_response.text}")
-                raise Exception(
-                    f"ElizaOS API error: {list_response.status_code} - {list_response.text}"
-                )
-
-            eliza_rooms_data = list_response.json()
-
-            # Handle different response formats
-            rooms_list = (
-                eliza_rooms_data.get("rooms") or
-                eliza_rooms_data.get("data") or
-                (eliza_rooms_data if isinstance(eliza_rooms_data, list) else [])
-            )
-
-            # Filter rooms that include user's agents
             user_rooms = []
-            for room in rooms_list:
-                room_agent_ids = room.get("agentIds") or room.get("agent_ids") or []
-                # Check if any of the user's agents are in this room
-                if any(agent_id in room_agent_ids for agent_id in user_agent_ids):
-                    user_rooms.append({
-                        "id": room.get("id"),
-                        "name": room.get("name"),
-                        "description": room.get("description"),
-                        "created_at": room.get("created_at") or room.get("createdAt"),
-                        "agent_ids": room_agent_ids,
-                    })
+
+            # Query rooms for each of the user's agents
+            for agent_id in user_agent_ids:
+                try:
+                    list_url = get_eliza_api_url(f"/api/agents/{agent_id}/rooms")
+
+                    list_response = requests.get(list_url, timeout=30)
+
+                    if not list_response.ok:
+                        print(f"Failed to get rooms for agent {agent_id}: {list_response.status_code}")
+                        continue  # Skip this agent if rooms query fails
+
+                    agent_rooms_data = list_response.json()
+
+                    # ElizaOS returns: {"success": true, "data": {"rooms": [...]}}
+                    if agent_rooms_data.get("success"):
+                        rooms_list = agent_rooms_data.get("data", {}).get("rooms", [])
+
+                        for room in rooms_list:
+                            # Add room to user_rooms if not already there (avoid duplicates)
+                            room_id = room.get("id")
+                            if not any(r.get("id") == room_id for r in user_rooms):
+                                user_rooms.append({
+                                    "id": room_id,
+                                    "name": room.get("name"),
+                                    "source": room.get("source"),
+                                    "worldId": room.get("worldId"),
+                                    "entities": room.get("entities", []),
+                                })
+
+                except Exception as e:
+                    print(f"Error querying rooms for agent {agent_id}: {str(e)}")
+                    continue  # Skip this agent and continue with others
 
         except requests.exceptions.RequestException as e:
             raise HTTPException(
