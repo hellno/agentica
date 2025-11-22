@@ -1,0 +1,10 @@
+node_modules/
+__pycache__/
+
+# Environment variables (contains secrets - never commit!)
+.env
+.env.local
+.env.*.local
+
+# CDP credentials
+cdp_api_key.json
