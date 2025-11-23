@@ -13,13 +13,12 @@ import { CDPReactProvider } from "@coinbase/cdp-react";
 import { useEvmAddress, useSignOut } from '@coinbase/cdp-hooks';
 import { getRooms, type Room } from '@/lib/platform-api';
 import { MorphingSquare } from '@/components/molecule-ui/morphing-square';
+import { useZapperPortfolio } from '@/hooks/use-zapper-portfolio';
 
 // Separate component for dashboard that uses CDP hooks
 function TradingDashboard({
   preferences,
   setPreferences,
-  portfolio,
-  setPortfolio,
   trades,
   isTradeModalOpen,
   setIsTradeModalOpen,
@@ -32,6 +31,11 @@ function TradingDashboard({
   const [currentRoom, setCurrentRoom] = useState<Room | null>(null);
   const [rooms, setRooms] = useState<Room[]>([]);
   const [isLoadingRooms, setIsLoadingRooms] = useState(false);
+
+  // Fetch real portfolio data from Zapper for user's wallet
+  const { portfolio, loading: portfolioLoading } = useZapperPortfolio(
+    evmAddress
+  );
 
   // Fetch user's rooms when wallet is connected
   useEffect(() => {
@@ -171,16 +175,8 @@ export default function Page() {
   const [isOnboarded, setIsOnboarded] = useState(false);
   const [preferences, setPreferences] = useState<Preferences | null>(null);
 
-  // Portfolio State - will be fetched from wallet API
-  const [portfolio, setPortfolio] = useState<PortfolioState>({
-    totalValue: 0,
-    cashBalance: 0,
-    assets: [],
-    history: []
-  });
-
   // Feeds State
-  const [trades, setTrades] = useState<Trade[]>([]);
+  const [trades] = useState<Trade[]>([]);
 
   // UI State
   const [isTradeModalOpen, setIsTradeModalOpen] = useState(false);
@@ -216,8 +212,6 @@ export default function Page() {
         <TradingDashboard
           preferences={preferences}
           setPreferences={setPreferences}
-          portfolio={portfolio}
-          setPortfolio={setPortfolio}
           trades={trades}
           isTradeModalOpen={isTradeModalOpen}
           setIsTradeModalOpen={setIsTradeModalOpen}
