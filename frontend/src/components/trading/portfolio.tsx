@@ -1,15 +1,25 @@
 'use client';
 
-import React from 'react';
+import React, { useState } from 'react';
+import dynamic from 'next/dynamic';
 import { PieChart, Pie, Cell, ResponsiveContainer, AreaChart, Area, Tooltip } from 'recharts';
 import { PortfolioState } from '@/types/trading';
-import { TrendingUp, TrendingDown } from 'lucide-react';
+import { TrendingUp, TrendingDown, Plus } from 'lucide-react';
+import { Room } from '@/lib/platform-api';
+
+// Dynamically import SimpleDaimoModal
+const SimpleDaimoModal = dynamic(() => import('./simple-daimo-modal'), {
+  ssr: false,
+});
 
 interface PortfolioProps {
   data: PortfolioState;
+  currentRoom: Room | null;
 }
 
-const Portfolio: React.FC<PortfolioProps> = ({ data }) => {
+const Portfolio: React.FC<PortfolioProps> = ({ data, currentRoom }) => {
+  const [isDaimoModalOpen, setIsDaimoModalOpen] = useState(false);
+
   // Calculate daily performance (mocked logic for display)
   const startValue = data.history[0]?.value || data.totalValue;
   const change = data.totalValue - startValue;
@@ -20,7 +30,16 @@ const Portfolio: React.FC<PortfolioProps> = ({ data }) => {
     <div className="space-y-6">
       {/* Total Value Card */}
       <div className="bg-white rounded-2xl p-6 shadow-sm border border-slate-100">
-        <h3 className="text-sm font-medium text-slate-500 mb-1">Total Portfolio Value</h3>
+        <div className="flex items-center justify-between mb-1">
+          <h3 className="text-sm font-medium text-slate-500">Total Portfolio Value</h3>
+          <button
+            onClick={() => setIsDaimoModalOpen(true)}
+            className="p-2 hover:bg-indigo-50 rounded-lg transition-colors group"
+            title="Deposit Funds"
+          >
+            <Plus className="w-5 h-5 text-slate-400 group-hover:text-indigo-600 transition-colors" />
+          </button>
+        </div>
         <div className="flex items-baseline gap-3">
           <h2 className="text-4xl font-bold text-slate-900">
             ${data.totalValue.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
@@ -106,6 +125,13 @@ const Portfolio: React.FC<PortfolioProps> = ({ data }) => {
           </div>
         </div>
       </div>
+
+      {/* Daimo Deposit Modal */}
+      <SimpleDaimoModal
+        isOpen={isDaimoModalOpen}
+        onClose={() => setIsDaimoModalOpen(false)}
+        smartAccountAddress={currentRoom?.smart_account_address}
+      />
     </div>
   );
 };
