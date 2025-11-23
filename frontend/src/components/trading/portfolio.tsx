@@ -2,15 +2,7 @@
 
 import React, { useState } from "react";
 import dynamic from "next/dynamic";
-import {
-  PieChart,
-  Pie,
-  Cell,
-  ResponsiveContainer,
-  AreaChart,
-  Area,
-  Tooltip,
-} from "recharts";
+import { PieChart, Pie, Cell, ResponsiveContainer } from "recharts";
 import { PortfolioState } from "@/types/trading";
 import { TrendingUp, TrendingDown, Plus } from "lucide-react";
 import { Room } from "@/lib/platform-api";
@@ -58,44 +50,19 @@ const Portfolio: React.FC<PortfolioProps> = ({ data, currentRoom }) => {
               maximumFractionDigits: 2,
             })}
           </h2>
-          {/*<div className={`flex items-center gap-1 text-sm font-semibold ${isPositive ? 'text-green-500' : 'text-red-500'}`}>
-            {isPositive ? <TrendingUp className="w-4 h-4" /> : <TrendingDown className="w-4 h-4" />}
-            <span>{isPositive ? '+' : ''}{percentChange}% (24h)</span>
-          </div>*/}
-        </div>
-
-        {/* Mini Area Chart */}
-        <div className="h-24 w-full mt-4">
-          <ResponsiveContainer width="100%" height="100%">
-            <AreaChart data={data.history}>
-              <defs>
-                <linearGradient id="colorValue" x1="0" y1="0" x2="0" y2="1">
-                  <stop
-                    offset="5%"
-                    stopColor={isPositive ? "#14F195" : "#EF4444"}
-                    stopOpacity={0.1}
-                  />
-                  <stop
-                    offset="95%"
-                    stopColor={isPositive ? "#14F195" : "#EF4444"}
-                    stopOpacity={0}
-                  />
-                </linearGradient>
-              </defs>
-              <Tooltip
-                contentStyle={{ display: "none" }}
-                cursor={{ stroke: "#cbd5e1" }}
-              />
-              <Area
-                type="monotone"
-                dataKey="value"
-                stroke={isPositive ? "#10B981" : "#EF4444"}
-                strokeWidth={2}
-                fillOpacity={1}
-                fill="url(#colorValue)"
-              />
-            </AreaChart>
-          </ResponsiveContainer>
+          <div
+            className={`flex items-center gap-1 text-sm font-semibold ${isPositive ? "text-green-500" : "text-red-500"}`}
+          >
+            {isPositive ? (
+              <TrendingUp className="w-4 h-4" />
+            ) : (
+              <TrendingDown className="w-4 h-4" />
+            )}
+            <span>
+              {isPositive ? "+" : ""}
+              {percentChange}% (24h)
+            </span>
+          </div>
         </div>
       </div>
 
