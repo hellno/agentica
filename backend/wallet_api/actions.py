@@ -363,7 +363,7 @@ async def handle_swap(room_id: str, params: Dict[str, Any], cdp_client) -> Dict[
         import os
         paymaster_url = os.getenv("CDP_PAYMASTER_URL")
 
-        if from_token.lower() not in ["0x0000000000000000000000000000000000000000", "eth"]:
+        if from_token_address.lower() != "0x0000000000000000000000000000000000000000":  # Not native ETH
             try:
                 from cdp.evm_call_types import EncodedCall
                 from web3 import Web3
@@ -387,7 +387,7 @@ async def handle_swap(room_id: str, params: Dict[str, Any], cdp_client) -> Dict[
                     network="base",
                     calls=[
                         EncodedCall(
-                            to=from_token,  # USDC contract address
+                            to=from_token_address,  # Token contract address (resolved)
                             data=approve_data,
                             value=0
                         )
@@ -415,8 +415,8 @@ async def handle_swap(room_id: str, params: Dict[str, Any], cdp_client) -> Dict[
             # All-in-one swap method (now with Permit2 approval set)
             swap_options = SmartAccountSwapOptions(
                 network="base",
-                from_token=from_token,
-                to_token=to_token,
+                from_token=from_token_address,  # Use resolved address
+                to_token=to_token_address,       # Use resolved address
                 from_amount=str(amount),
                 slippage_bps=slippage_bps
             )
