@@ -10,7 +10,7 @@ This API provides endpoints for:
 Supported Actions:
     - balance: Get smart account address and wallet information
     - transfer: Send ETH via smart account with gas sponsorship
-    - swap: Token swap via DEX (returns HTTP 501 - not yet implemented)
+    - swap: Token swap via CDP Trade API (powered by 0x aggregator)
 
 Architecture:
     - CDP Server Wallet v2 stores keys on CDP servers (secure)
@@ -256,7 +256,7 @@ async def create_wallet_endpoint(request: CreateWalletRequest) -> WalletResponse
                 owner_account_name=owner_account_name,
                 owner_address=owner_address,
                 smart_account_address=smart_account_address,
-                network="base-sepolia"
+                network="base"  # Base Mainnet
             )
         except Exception as e:
             # If database insert fails, accounts still exist on CDP
@@ -272,7 +272,7 @@ async def create_wallet_endpoint(request: CreateWalletRequest) -> WalletResponse
             owner_account_name=owner_account_name,
             owner_address=owner_address,
             smart_account_address=smart_account_address,
-            network="base-sepolia"
+            network="base"  # Base Mainnet
         )
 
     except HTTPException:
@@ -310,7 +310,7 @@ async def dynamic_action_endpoint(
     dynamic router that supports multiple action types:
     - balance: Get wallet address and account information
     - transfer: Send ETH via smart account with gas sponsorship
-    - swap: Token swap via DEX (returns HTTP 501 - not yet implemented)
+    - swap: Token swap via CDP Trade API (powered by 0x aggregator)
 
     Transaction Logging:
     All actions are logged to the database for audit trail. Failed transactions

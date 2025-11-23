@@ -4,7 +4,7 @@ import React, { useState, useEffect, useCallback, useRef } from 'react';
 import { Room } from '@/lib/platform-api';
 import SocketIOManager from '@/lib/socketio-manager';
 import { ChatMessage } from '@/types/chat-message';
-import { ChatMessages } from '@/components/chat-messages';
+import { CompactChatMessage } from '@/components/trading/compact-chat-message';
 import { v4 as uuidv4 } from 'uuid';
 import { MessageCircle, Send } from 'lucide-react';
 
@@ -13,8 +13,8 @@ interface StrategyChatProps {
   userEntity: string;
 }
 
-const USER_NAME = "You";
-const CHAT_SOURCE = "strategy_chat";
+const USER_NAME = "user"; // Match ElizaOS admin UI format
+const CHAT_SOURCE = "client_group_chat"; // Match ElizaOS admin UI format
 
 export default function StrategyChat({ room, userEntity }: StrategyChatProps) {
   const [messages, setMessages] = useState<ChatMessage[]>([]);
@@ -24,6 +24,7 @@ export default function StrategyChat({ room, userEntity }: StrategyChatProps) {
 
   const socketIOManager = SocketIOManager.getInstance();
   const messageEndRef = useRef<HTMLDivElement>(null);
+  const isInitialLoadRef = useRef(true); // Track initial history load
 
   // Initialize Socket.IO connection when room changes
   useEffect(() => {
@@ -31,6 +32,9 @@ export default function StrategyChat({ room, userEntity }: StrategyChatProps) {
       setConnectionStatus("error");
       return;
     }
+
+    // Reset initial load flag when room changes
+    isInitialLoadRef.current = true;
 
     console.log('[StrategyChat] Initializing connection for room:', room.name);
 
@@ -50,18 +54,45 @@ export default function StrategyChat({ room, userEntity }: StrategyChatProps) {
       }
     };
 
-    joinChannel();
+    // Load message history from API
+    const loadHistory = async () => {
+      try {
+        console.log('[StrategyChat] Loading message history...');
+        const response = await fetch(`/api/eliza/central-channels/${room.eliza_room_id}/messages?limit=50`);
 
-    // TODO: Load message history from API
-    // const loadHistory = async () => {
-    //   try {
-    //     const history = await getChannelMessages(room.eliza_room_id);
-    //     setMessages(history);
-    //   } catch (error) {
-    //     console.error('[StrategyChat] Failed to load history:', error);
-    //   }
-    // };
-    // loadHistory();
+        if (response.ok) {
+          const data = await response.json();
+          const historyMessages = (data?.data?.messages || []).map((msg: any) => {
+            const isAgent = msg.authorId === room.strategy_agent_id || msg.sourceType === 'agent_response';
+            return {
+              id: msg.id || uuidv4(),
+              name: isAgent ? room.name : 'user',
+              text: msg.content,
+              senderId: msg.authorId,
+              roomId: room.eliza_room_id,
+              createdAt: msg.created_at || Date.now(),
+              source: msg.sourceType || 'unknown',
+              thought: msg.rawMessage?.thought,
+              actions: msg.rawMessage?.actions,
+            };
+          });
+
+          setMessages(historyMessages.reverse()); // Reverse to show oldest first
+          console.log('[StrategyChat] Loaded', historyMessages.length, 'messages');
+
+          // Mark initial load as complete after a brief delay
+          setTimeout(() => {
+            isInitialLoadRef.current = false;
+          }, 100);
+        }
+      } catch (error) {
+        console.error('[StrategyChat] Failed to load history:', error);
+        isInitialLoadRef.current = false; // Mark complete even on error
+      }
+    };
+
+    joinChannel();
+    loadHistory();
 
     return () => {
       // Leave channel on cleanup
@@ -105,10 +136,13 @@ export default function StrategyChat({ room, userEntity }: StrategyChatProps) {
     };
   }, [room?.id, userEntity]);
 
-  // Auto-scroll to bottom only when new messages arrive
+  // Auto-scroll to bottom only when new messages arrive (not on initial load)
   const prevMessageCountRef = useRef(0);
   useEffect(() => {
-    if (messages.length > prevMessageCountRef.current) {
+    // Only auto-scroll if:
+    // 1. Message count increased
+    // 2. Initial load is complete (prevents page jiggle on history load)
+    if (messages.length > prevMessageCountRef.current && !isInitialLoadRef.current) {
       messageEndRef.current?.scrollIntoView({ behavior: "smooth" });
     }
     prevMessageCountRef.current = messages.length;
@@ -137,16 +171,70 @@ export default function StrategyChat({ room, userEntity }: StrategyChatProps) {
     try {
       console.log('[StrategyChat] Sending message to room:', room.eliza_room_id);
 
-      // Send via Socket.IO to the room's channel
-      await socketIOManager.sendChannelMessage(
-        messageText,
-        "00000000-0000-0000-0000-000000000000", // Central channel
-        CHAT_SOURCE,
-        room.eliza_room_id, // Session channel (room ID)
-        room.strategy_agent_id // Server ID (agent ID)
-      );
+      // Convert wallet address to UUID (ElizaOS requires UUID for author_id)
+      // Use same method as backend: uuid.uuid5(NAMESPACE_DNS, "user:address")
+      const encoder = new TextEncoder();
+      const data = encoder.encode(`user:${userEntity}`);
+      const hashBuffer = await crypto.subtle.digest('SHA-1', data);
+      const hashArray = Array.from(new Uint8Array(hashBuffer));
 
-      console.log('[StrategyChat] Message sent successfully');
+      // UUID v5 format: xxxxxxxx-xxxx-5xxx-yxxx-xxxxxxxxxxxx
+      hashArray[6] = (hashArray[6] & 0x0f) | 0x50; // Version 5
+      hashArray[8] = (hashArray[8] & 0x3f) | 0x80; // Variant
+
+      const author_uuid = [
+        hashArray.slice(0, 4).map(b => b.toString(16).padStart(2, '0')).join(''),
+        hashArray.slice(4, 6).map(b => b.toString(16).padStart(2, '0')).join(''),
+        hashArray.slice(6, 8).map(b => b.toString(16).padStart(2, '0')).join(''),
+        hashArray.slice(8, 10).map(b => b.toString(16).padStart(2, '0')).join(''),
+        hashArray.slice(10, 16).map(b => b.toString(16).padStart(2, '0')).join('')
+      ].join('-');
+
+      console.log('[StrategyChat] Converted author_id:', author_uuid);
+
+      // Use REST API for sending messages (per ElizaOS OpenAPI spec)
+      const messageId = uuidv4();
+
+      const response = await fetch(`/api/eliza/central-channels/${room.eliza_room_id}/messages`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          author_id: author_uuid, // UUID required by ElizaOS
+          content: messageText,
+          server_id: "00000000-0000-0000-0000-000000000000",
+          source_type: CHAT_SOURCE,
+          // Match ElizaOS admin UI format - include raw_message with Socket.IO structure
+          raw_message: {
+            roomId: room.eliza_room_id,
+            source: CHAT_SOURCE,
+            message: messageText,
+            metadata: {
+              channelType: "GROUP",
+            },
+            senderId: author_uuid,
+            serverId: "00000000-0000-0000-0000-000000000000",
+            channelId: room.eliza_room_id,
+            messageId: messageId,
+            senderName: USER_NAME,
+          },
+          metadata: {
+            serverId: "00000000-0000-0000-0000-000000000000",
+            channelType: "GROUP",
+            user_display_name: USER_NAME,
+            wallet_address: userEntity, // Store original address in metadata
+          },
+        }),
+      });
+
+      if (!response.ok) {
+        const error = await response.json();
+        throw new Error(error.error || 'Failed to send message');
+      }
+
+      console.log('[StrategyChat] Message sent via REST API');
+      // Message will arrive via Socket.IO messageBroadcast event
     } catch (error) {
       console.error('[StrategyChat] Failed to send message:', error);
       setIsLoading(false);
@@ -201,12 +289,14 @@ export default function StrategyChat({ room, userEntity }: StrategyChatProps) {
           </div>
         ) : (
           <>
-            <ChatMessages
-              messages={messages}
-              citationsMap={{}}
-              followUpPromptsMap={{}}
-              onFollowUpClick={handleFollowUpClick}
-            />
+            {messages.map((msg) => (
+              <CompactChatMessage
+                key={msg.id}
+                message={msg}
+                isUser={msg.name === 'user'}
+                agentName={room.name}
+              />
+            ))}
             <div ref={messageEndRef} />
           </>
         )}

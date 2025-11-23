@@ -172,6 +172,8 @@ eliza_image = (
         "NODE_TLS_REJECT_UNAUTHORIZED": "0",
         # ElizaOS server URL for health checks and inter-service communication
         "ELIZA_SERVER_URL": "https://herocast--agentica-platform-eliza-server.modal.run",
+        # Wallet API URL for autonomous trading actions
+        "WALLET_API_URL": "https://herocast--agentica-wallet-api.modal.run",
     })
     # Install Python dependencies for config.py
     .pip_install(
@@ -449,6 +451,63 @@ def eliza_server():
         print("Port: 3000")
         print("Tunnel will be available via Modal")
         print("=" * 80 + "\n")
+
+        # Restart all active agents on server startup
+        try:
+            print("\n" + "=" * 80)
+            print("RESTARTING ACTIVE AGENTS")
+            print("=" * 80)
+
+            from backend.config import create_supabase_client, get_eliza_api_url
+            import requests
+
+            supabase = create_supabase_client()
+
+            # Query all agents with status='active' from platform_agents
+            result = supabase.table("platform_agents").select("eliza_agent_id, name").eq("status", "active").execute()
+            active_agents = result.data or []
+
+            print(f"Found {len(active_agents)} active agents to restart")
+
+            # Give ElizaOS time to fully initialize before starting agents
+            initialization_delay = 10
+            print(f"Waiting {initialization_delay} seconds for ElizaOS to fully initialize...")
+            time.sleep(initialization_delay)
+
+            # Start each agent
+            restarted_count = 0
+            failed_count = 0
+
+            for agent in active_agents:
+                agent_id = agent.get("eliza_agent_id")
+                agent_name = agent.get("name", "Unknown")
+
+                if not agent_id:
+                    print(f"⚠ Skipping agent '{agent_name}': no eliza_agent_id")
+                    continue
+
+                try:
+                    start_url = get_eliza_api_url(f"/api/agents/{agent_id}/start")
+                    response = requests.post(start_url, timeout=10)
+
+                    if response.ok:
+                        print(f"✓ Restarted: {agent_name} ({agent_id})")
+                        restarted_count += 1
+                    else:
+                        print(f"✗ Failed to restart {agent_name}: {response.status_code}")
+                        failed_count += 1
+
+                except Exception as e:
+                    print(f"✗ Error restarting {agent_name}: {str(e)}")
+                    failed_count += 1
+
+            print(f"\nAgent restart summary: {restarted_count} restarted, {failed_count} failed")
+            print("=" * 80 + "\n")
+
+        except Exception as e:
+            # Don't fail server startup if agent restart fails
+            print(f"\n⚠ Warning: Failed to restart agents: {str(e)}")
+            print("Server will continue, but agents may need manual restart\n")
 
         # Return the process - Modal will manage tunnel and keep it running
         return process

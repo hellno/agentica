@@ -46,7 +46,7 @@ async def create_wallet(
     owner_account_name: str,
     owner_address: str,
     smart_account_address: str,
-    network: str = "base-sepolia"
+    network: str = "base"  # Base Mainnet
 ) -> Dict[str, Any]:
     """
     Create a new wallet record in the database.

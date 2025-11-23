@@ -32,9 +32,9 @@ function TradingDashboard({
   const [rooms, setRooms] = useState<Room[]>([]);
   const [isLoadingRooms, setIsLoadingRooms] = useState(false);
 
-  // Fetch real portfolio data from Zapper for user's wallet
+  // Fetch real portfolio data from Zapper for the current room's smart account
   const { portfolio, loading: portfolioLoading } = useZapperPortfolio(
-    evmAddress
+    currentRoom?.smart_account_address
   );
 
   // Fetch user's rooms when wallet is connected
@@ -46,14 +46,17 @@ function TradingDashboard({
           const userRooms = await getRooms(evmAddress);
           console.log('[TradingDashboard] Fetched rooms:', userRooms);
 
-          // Ensure userRooms is an array
+          // Ensure userRooms is an array and sort by created_at descending (newest first)
           const roomsArray = Array.isArray(userRooms) ? userRooms : [];
-          setRooms(roomsArray);
+          const sortedRooms = roomsArray.sort((a, b) =>
+            new Date(b.created_at).getTime() - new Date(a.created_at).getTime()
+          );
+          setRooms(sortedRooms);
 
-          // Set current room to the first one if available
-          if (roomsArray.length > 0 && !currentRoom) {
-            setCurrentRoom(roomsArray[0]);
-            console.log('[TradingDashboard] Set current room:', roomsArray[0].name);
+          // Set current room to the newest one (first in sorted array) if available
+          if (sortedRooms.length > 0 && !currentRoom) {
+            setCurrentRoom(sortedRooms[0]);
+            console.log('[TradingDashboard] Set current room (newest):', sortedRooms[0].name);
           }
         } catch (error) {
           console.error('[TradingDashboard] Error fetching rooms:', error);

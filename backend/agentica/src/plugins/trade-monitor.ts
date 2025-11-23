@@ -794,9 +794,136 @@ export class TradeMonitorService extends Service {
       }
 
       logger.info({ roomCount: roomIds.length, alertText }, 'Alert broadcast complete');
+
+      // ============================
+      // AUTONOMOUS TRADING INTEGRATION
+      // ============================
+      // Evaluate trade signal and trigger wallet actions if criteria met
+      await this.evaluateAndExecuteTrade(trade, resolvedAddr, roomIds);
     } catch (error) {
       logger.error({ error }, 'Failed to broadcast alert');
     }
+  }
+
+  /**
+   * Evaluate trade signal and execute autonomous trading if criteria met.
+   *
+   * This is where trading strategy logic lives:
+   * - Analyze detected trade (value, tokens, protocol)
+   * - Check if it matches strategy criteria
+   * - Trigger SWAP action via wallet-actions plugin
+   *
+   * Example criteria:
+   * - Follow trades > $10k value
+   * - Only copy specific token pairs (ETH/USDC)
+   * - Limit position size to % of portfolio
+   */
+  private async evaluateAndExecuteTrade(
+    trade: TradeTransaction,
+    resolvedAddr: ResolvedAddress,
+    roomIds: string[]
+  ): Promise<void> {
+    try {
+      logger.info({ trade, resolvedAddr }, 'Evaluating trade for autonomous execution');
+
+      // Example strategy logic (customize based on your needs)
+      const shouldExecute = this.shouldExecuteTrade(trade);
+
+      if (!shouldExecute) {
+        logger.debug({ trade }, 'Trade does not meet execution criteria');
+        return;
+      }
+
+      logger.info({ trade }, '✅ Trade meets criteria - executing autonomous swap');
+
+      // Trigger SWAP action for each room
+      for (const roomId of roomIds) {
+        try {
+          // Create a message that will trigger the SWAP action
+          // The wallet-actions plugin will handle the actual execution
+          const swapMessage: Memory = {
+            id: crypto.randomUUID() as `${string}-${string}-${string}-${string}-${string}`,
+            entityId: this.runtime.agentId,
+            agentId: this.runtime.agentId,
+            roomId: roomId as `${string}-${string}-${string}-${string}-${string}`,
+            content: {
+              text: `swap ${trade.amountIn} ${trade.tokenIn} for ${trade.tokenOut}`,
+              source: 'trade-monitor-autonomous',
+              action: 'SWAP',
+              tradeSignal: trade,
+              autonomous: true,
+            },
+            createdAt: Date.now(),
+          };
+
+          // Store the autonomous trading decision
+          await this.runtime.createMemory(swapMessage, 'messages');
+
+          logger.info(
+            { roomId, tokenIn: trade.tokenIn, tokenOut: trade.tokenOut, amount: trade.amountIn },
+            'Autonomous SWAP triggered'
+          );
+        } catch (error) {
+          logger.error({ error, roomId }, 'Failed to trigger autonomous swap for room');
+        }
+      }
+    } catch (error) {
+      logger.error({ error }, 'Error in evaluateAndExecuteTrade');
+    }
+  }
+
+  /**
+   * Trading strategy logic - determine if a detected trade should be copied.
+   *
+   * Customize this method to implement your trading strategy:
+   * - Minimum trade size
+   * - Specific tokens/protocols
+   * - Risk management rules
+   * - Portfolio limits
+   */
+  private shouldExecuteTrade(trade: TradeTransaction): boolean {
+    // Example strategy (CUSTOMIZE THIS):
+
+    // 1. Minimum trade value ($1,000 USD)
+    if (trade.valueUSD < 1000) {
+      logger.debug({ valueUSD: trade.valueUSD }, 'Trade below minimum value threshold');
+      return false;
+    }
+
+    // 2. Only copy specific token pairs (customize list)
+    const allowedTokenPairs = [
+      ['WETH', 'USDC'],
+      ['USDC', 'WETH'],
+      ['ETH', 'USDC'],
+      ['USDC', 'ETH'],
+    ];
+
+    const isPairAllowed = allowedTokenPairs.some(
+      ([tokenA, tokenB]) =>
+        (trade.tokenIn === tokenA && trade.tokenOut === tokenB) ||
+        (trade.tokenIn === tokenB && trade.tokenOut === tokenA)
+    );
+
+    if (!isPairAllowed) {
+      logger.debug({ tokenIn: trade.tokenIn, tokenOut: trade.tokenOut }, 'Token pair not allowed');
+      return false;
+    }
+
+    // 3. Only copy trades from specific protocols (optional)
+    const allowedProtocols = ['Uniswap V3', 'Uniswap V2', 'Sushiswap'];
+    if (!allowedProtocols.includes(trade.protocol)) {
+      logger.debug({ protocol: trade.protocol }, 'Protocol not allowed');
+      return false;
+    }
+
+    // 4. Maximum single trade size ($50k USD)
+    if (trade.valueUSD > 50000) {
+      logger.debug({ valueUSD: trade.valueUSD }, 'Trade exceeds maximum size');
+      return false;
+    }
+
+    logger.info({ trade }, '✅ Trade passes all strategy criteria');
+    return true;
   }
 
   // ============================
@@ -844,7 +971,7 @@ const addTradeMonitorAction: Action = {
 
     // Also check for address patterns
     const hasAddress =
-      text.includes('.eth') || text.includes('0x') || text.match(/\b@?\w+\b/);
+      text.includes('.eth') || text.includes('0x') || !!text.match(/\b@?\w+\b/);
 
     return (hasMonitorKeyword && hasTradeKeyword) || (hasMonitorKeyword && hasAddress);
   },

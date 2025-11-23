@@ -496,14 +496,16 @@ class SocketIOManager extends EventAdapter {
       payload: {
         senderId: this.entityId,
         senderName: USER_NAME,
-        message,
+        content: message, // ElizaOS expects 'content' not 'message'
         channelId: finalChannelId, // Use session channel ID for proper routing
         roomId: finalChannelId, // Keep for backward compatibility
         serverId: serverId || this.serverId,
         messageId,
         source,
         attachments: [],
-        metadata: {},
+        metadata: {
+          channelType: "GROUP", // Required for ElizaOS group chat routing
+        },
       },
     });
 

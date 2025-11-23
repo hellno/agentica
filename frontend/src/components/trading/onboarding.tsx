@@ -41,10 +41,10 @@ const STRATEGIES = [
 
 const LOADING_MESSAGES = [
   { message: "Analyzing your strategy...", delay: 0 },
-  { message: "Generating AI trading agent...", delay: 1500 },
-  { message: "Creating secure wallet...", delay: 3000 },
-  { message: "Setting up smart account...", delay: 4500 },
-  { message: "Finalizing portfolio...", delay: 6000 },
+  { message: "Generating AI trading agent...", delay: 3000 },
+  { message: "Creating secure wallet...", delay: 6000 },
+  { message: "Setting up smart account...", delay: 10000 },
+  { message: "Finalizing portfolio...", delay: 14000 },
 ];
 
 const Onboarding: React.FC<OnboardingProps> = ({ onComplete }) => {
@@ -77,16 +77,17 @@ const Onboarding: React.FC<OnboardingProps> = ({ onComplete }) => {
 
     const timers = LOADING_MESSAGES.map((msg, index) => {
       return setTimeout(() => {
-        setLoadingMessageIndex(index);
+        // Only advance forward, never go backwards
+        setLoadingMessageIndex(prev => Math.max(prev, index));
       }, msg.delay);
     });
 
-    // Show skip button after 8 seconds if room was created
+    // Show skip button after 16 seconds if room was created (gives time for final step)
     const skipTimer = setTimeout(() => {
       if (roomCreated) {
         setShowSkipButton(true);
       }
-    }, 8000);
+    }, 16000);
 
     return () => {
       timers.forEach(timer => clearTimeout(timer));
