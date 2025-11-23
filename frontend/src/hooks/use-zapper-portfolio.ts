@@ -98,13 +98,20 @@ export function useZapperPortfolio(address: string | undefined) {
           .slice(0, 6) // Top 6 assets
           .map((edge, index) => ({
             symbol: edge.node.symbol,
+            name: edge.node.name,
             amount: parseFloat(edge.node.balance),
             currentPrice: edge.node.price,
+            avgBuyPrice: edge.node.price, // Use current price as placeholder (no historical data)
             color: ASSET_COLORS[index % ASSET_COLORS.length],
           }));
 
         // Create simple history (just current value)
-        const history = [{ value: totalValue }];
+        const history = [
+          {
+            time: new Date().toISOString(),
+            value: totalValue,
+          }
+        ];
 
         console.log('[useZapperPortfolio] Portfolio data:', {
           totalValue,
