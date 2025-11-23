@@ -36,6 +36,8 @@
     "@codemirror/search": "^6.5.11",
     "@codemirror/state": "^6.5.0",
     "@codemirror/view": "^6.35.3",
+    "@connectrpc/connect-web": "^2.1.1",
+    "@edgeandnode/amp": "^0.0.51",
     "@elizaos/cli": "^1.0.9",
     "@elizaos/core": "^1.0.9",
     "@elizaos/plugin-anthropic": "^1.0.3",
