@@ -39,6 +39,8 @@
     "@coinbase/cdp-core": "^0.0.67",
     "@coinbase/cdp-hooks": "^0.0.67",
     "@coinbase/cdp-react": "^0.0.67",
+    "@connectrpc/connect-web": "^2.1.1",
+    "@edgeandnode/amp": "^0.0.51",
     "@elizaos/cli": "^1.0.9",
     "@elizaos/core": "^1.0.9",
     "@elizaos/plugin-anthropic": "^1.0.3",
