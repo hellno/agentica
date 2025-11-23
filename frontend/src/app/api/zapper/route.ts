@@ -1,17 +1,43 @@
 import { NextRequest, NextResponse } from "next/server";
-import { unstable_cache } from "next/cache";
 
 // Route segment config for dynamic caching
 export const dynamic = "force-dynamic"; // Required for query params
 export const revalidate = 300; // Fallback revalidation period (5 minutes)
 
+// Simple in-memory cache with TTL
+interface CacheEntry<T> {
+  data: T;
+  timestamp: number;
+}
+
+const portfolioCache = new Map<string, CacheEntry<any>>();
+const batchCache = new Map<string, CacheEntry<any>>();
+const CACHE_TTL = 5 * 60 * 1000; // 5 minutes in milliseconds
+
+function getCachedData<T>(cache: Map<string, CacheEntry<T>>, key: string): T | null {
+  const entry = cache.get(key);
+  if (!entry) return null;
+
+  const age = Date.now() - entry.timestamp;
+  if (age > CACHE_TTL) {
+    cache.delete(key);
+    return null;
+  }
+
+  console.log(`[Cache] Hit for key: ${key.substring(0, 20)}... (age: ${Math.round(age / 1000)}s)`);
+  return entry.data;
+}
+
+function setCachedData<T>(cache: Map<string, CacheEntry<T>>, key: string, data: T): void {
+  cache.set(key, { data, timestamp: Date.now() });
+  console.log(`[Cache] Set for key: ${key.substring(0, 20)}...`);
+}
+
 /**
- * Cached function to fetch portfolio data from Zapper
- * Cache duration: 5 minutes (300 seconds)
- * Cache key includes address for granular caching
+ * Fetch portfolio data from Zapper (with in-memory caching)
+ * Cache duration: 5 minutes
  */
-const getCachedPortfolio = unstable_cache(
-  async (address: string) => {
+async function fetchPortfolioData(address: string) {
     const query = `
       query PortfolioData($addresses: [Address!]!) {
         portfolioV2(addresses: $addresses, chainIds: [8453]) {
@@ -85,16 +111,10 @@ const getCachedPortfolio = unstable_cache(
     }
 
     const result = await response.json();
-    console.log("✅ Zapper portfolio data received", result.data?.portfolioV2);
+    console.log("✅ Zapper portfolio data received");
 
     return result.data?.portfolioV2;
-  },
-  ["zapper-portfolio"], // Cache key namespace
-  {
-    revalidate: 300, // Cache for 5 minutes
-    tags: ["zapper"],
-  },
-);
+}
 
 /**
  * Zapper GraphQL API endpoint
@@ -119,14 +139,28 @@ export async function GET(request: NextRequest) {
   const address = rawAddress.startsWith("0x") ? rawAddress : `0x${rawAddress}`;
 
   try {
-    // Use cached function
-    const portfolioData = await getCachedPortfolio(address);
+    // Check cache first
+    const cached = getCachedData(portfolioCache, address);
+    if (cached) {
+      return NextResponse.json({
+        success: true,
+        data: cached,
+        address,
+        cached: true,
+      });
+    }
+
+    // Fetch fresh data
+    const portfolioData = await fetchPortfolioData(address);
+
+    // Cache the result
+    setCachedData(portfolioCache, address, portfolioData);
 
     return NextResponse.json({
       success: true,
       data: portfolioData,
       address,
-      cached: true,
+      cached: false,
     });
   } catch (error) {
     console.error("❌ Error calling Zapper:", error);
@@ -141,11 +175,10 @@ export async function GET(request: NextRequest) {
 }
 
 /**
- * Cached function to fetch batch portfolio data from Zapper
- * Cache duration: 5 minutes (300 seconds)
+ * Fetch batch portfolio data from Zapper (with in-memory caching)
+ * Cache duration: 5 minutes
  */
-const getCachedBatchPortfolio = unstable_cache(
-  async (addresses: string[]) => {
+async function fetchBatchPortfolioData(addresses: string[]) {
     const query = `
       query PortfolioData($addresses: [Address!]!) {
         portfolioV2(addresses: $addresses, chainIds: [8453]) {
@@ -199,13 +232,7 @@ const getCachedBatchPortfolio = unstable_cache(
     console.log("✅ Batch fetch complete");
 
     return result.data?.portfolioV2;
-  },
-  ["zapper-batch-portfolio"],
-  {
-    revalidate: 300, // Cache for 5 minutes
-    tags: ["zapper", "batch"],
-  },
-);
+}
 
 /**
  * POST endpoint for batch address lookups using GraphQL
@@ -231,14 +258,31 @@ export async function POST(request: NextRequest) {
     console.log("  Addresses:", addresses.length);
 
     try {
-      // Use cached function for batch portfolio
-      const portfolioData = await getCachedBatchPortfolio(addresses);
+      // Use addresses as cache key (sorted for consistency)
+      const cacheKey = addresses.sort().join(',');
+
+      // Check cache first
+      const cached = getCachedData(batchCache, cacheKey);
+      if (cached) {
+        return NextResponse.json({
+          success: true,
+          data: cached,
+          count: addresses.length,
+          cached: true,
+        });
+      }
+
+      // Fetch fresh data
+      const portfolioData = await fetchBatchPortfolioData(addresses);
+
+      // Cache the result
+      setCachedData(batchCache, cacheKey, portfolioData);
 
       return NextResponse.json({
         success: true,
         data: portfolioData,
         count: addresses.length,
-        cached: true,
+        cached: false,
       });
     } catch (error) {
       console.error("❌ Error in batch Zapper GraphQL call:", error);
