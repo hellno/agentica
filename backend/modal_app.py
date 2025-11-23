@@ -86,6 +86,7 @@ class CreateRoomRequest(BaseModel):
 
 class SendMessageRequest(BaseModel):
     """Request model for sending a message to a room."""
+    user_id: str = Field(..., description="User ID sending the message")
     content: str = Field(..., min_length=1, description="Message content/text")
     metadata: Optional[Dict[str, Any]] = Field(None, description="Optional message metadata")
 
@@ -93,7 +94,7 @@ class SendMessageRequest(BaseModel):
 class RoomResponse(BaseModel):
     """Response model for room information with wallet and strategy details."""
     id: str
-    eliza_room_id: str
+    eliza_channel_id: str
     name: str
     description: Optional[str]
     user_id: str
@@ -279,7 +280,7 @@ def eliza_server():
 
     # DEBUG: Check POSTGRES_URL before setting DATABASE_URL
     postgres_url = os.environ.get("POSTGRES_URL")
-    print(f"\nDEBUG - Before setting DATABASE_URL:")
+    print("\nDEBUG - Before setting DATABASE_URL:")
     print(f"  POSTGRES_URL: {'SET (' + postgres_url[:30] + '...)' if postgres_url else 'NOT SET'}")
     print(f"  DATABASE_URL: {'SET (' + os.environ.get('DATABASE_URL', '')[:30] + '...)' if os.environ.get('DATABASE_URL') else 'NOT SET'}")
 
@@ -288,7 +289,7 @@ def eliza_server():
     if postgres_url:
         os.environ["DATABASE_URL"] = postgres_url
         print("\n✓ Setting DATABASE_URL from POSTGRES_URL")
-        print(f"DEBUG - After setting DATABASE_URL:")
+        print("DEBUG - After setting DATABASE_URL:")
         print(f"  DATABASE_URL: {'SET (' + os.environ.get('DATABASE_URL', '')[:30] + '...)' if os.environ.get('DATABASE_URL') else 'FAILED TO SET!'}")
     else:
         print("\n✗ ERROR: POSTGRES_URL not found in environment!")
@@ -568,6 +569,7 @@ def api():
             Exception: If OpenAI API call fails
         """
         import os
+
         from openai import OpenAI
 
         # Initialize OpenAI client
@@ -935,7 +937,6 @@ Keep it concise and actionable. Automatically include these guardrails:
 
         # Stop agent in ElizaOS
         try:
-            tunnel_url = get_tunnel_url()
             stop_url = get_eliza_api_url(f"/api/agents/{eliza_agent_id}/stop")
 
             stop_response = requests.post(stop_url, timeout=10)
@@ -1068,11 +1069,13 @@ Keep it concise and actionable. Automatically include these guardrails:
             )
 
         # Step 3: Create strategy agent in ElizaOS
-        print(f"Creating strategy agent in ElizaOS")
+        print("Creating strategy agent in ElizaOS")
+        # Add room_id suffix to ensure each room gets a unique agent
+        # This prevents ElizaOS from returning the same agent for identical strategies
+        strategy_agent_name = f"{name} Strategy - Room {room_id[:8]}"  # Initialize before try block
         strategy_agent_id = None
         try:
             # Generate character config for strategy agent
-            strategy_agent_name = f"{name} Strategy"
             strategy_character_config = generate_character_config(
                 name=strategy_agent_name,
                 description=generated_strategy,
@@ -1123,49 +1126,86 @@ Keep it concise and actionable. Automatically include these guardrails:
         except Exception as e:
             print(f"Warning: Failed to start agent {strategy_agent_id}: {str(e)}")
 
-        # Step 5: Create ElizaOS room for the strategy agent
-        # Correct endpoint: POST /api/agents/{agentId}/rooms (not /api/rooms)
-        print(f"Creating ElizaOS room for agent {eliza_agent_id}")
-        eliza_room_id = None
+        # Step 5: Create ElizaOS channel for the strategy agent
+        # Use central-channels API instead of agent-specific rooms
+        # Validate strategy agent was created successfully
+        if not strategy_agent_id:
+            raise HTTPException(
+                status_code=500,
+                detail="Strategy agent was not created successfully"
+            )
+
+        print(f"Creating ElizaOS channel for agent {strategy_agent_id}")
+        from datetime import datetime
+        eliza_channel_id = None
         try:
-            # Create room FOR the strategy agent using correct ElizaOS API
-            create_room_url = get_eliza_api_url(f"/api/agents/{eliza_agent_id}/rooms")
-            room_payload = {
+            # Create GROUP channel for strategy room
+            create_channel_url = get_eliza_api_url("/api/messaging/central-channels")
+            channel_payload = {
                 "name": name,
-                "roomId": room_id,  # Use our platform room_id as the ElizaOS room ID
+                "server_id": "00000000-0000-0000-0000-000000000000",  # Default server UUID
+                "participantCentralUserIds": [strategy_agent_id],  # Only agent ID (must be UUID)
+                "type": "GROUP",
+                "metadata": {
+                    "source": "agentica-platform",
+                    "user_id": user_id,  # Store user_id in metadata instead
+                    "platform_room_id": room_id,  # Store our room_id for reference
+                    "strategy": generated_strategy[:200],  # Preview
+                    "wallet_address": wallet_address,
+                    "created_at": datetime.utcnow().isoformat(),
+                }
             }
 
-            room_response = requests.post(
-                create_room_url,
-                json=room_payload,
+            channel_response = requests.post(
+                create_channel_url,
+                json=channel_payload,
                 headers={"Content-Type": "application/json"},
                 timeout=30
             )
 
-            if not room_response.ok:
-                raise Exception(f"ElizaOS room creation error: {room_response.status_code} - {room_response.text}")
+            # Fix: Add detailed error logging for ElizaOS channel creation failures
+            if not channel_response.ok:
+                error_detail = f"ElizaOS channel creation failed: {channel_response.status_code} - {channel_response.text}"
+                print(f"ERROR: {error_detail}")
+                print(f"Channel payload sent: {channel_payload}")
+                raise Exception(error_detail)
 
-            room_data = room_response.json()
+            # Log successful channel creation
+            print(f"Successfully created ElizaOS channel: {channel_response.json()}")
 
-            # ElizaOS returns: {"success": true, "data": {"id": "...", "name": "...", ...}}
-            if not room_data.get("success"):
-                raise Exception(f"ElizaOS room creation failed: {room_data.get('error', {}).get('message', 'Unknown error')}")
+            channel_data = channel_response.json()
 
-            eliza_room_id = room_data.get("data", {}).get("id")
+            # Channel API returns channel data directly or in data field
+            eliza_channel_id = channel_data.get("id") or channel_data.get("data", {}).get("id")
 
-            if not eliza_room_id:
-                raise Exception(f"ElizaOS did not return room ID. Response: {room_data}")
+            if not eliza_channel_id:
+                raise Exception(f"ElizaOS did not return channel ID. Response: {channel_data}")
 
-            print(f"ElizaOS room created: {eliza_room_id}")
+            print(f"ElizaOS channel created: {eliza_channel_id}")
 
         except Exception as e:
             raise HTTPException(
                 status_code=500,
-                detail=f"Failed to create ElizaOS room: {str(e)}"
+                detail=f"Failed to create ElizaOS channel: {str(e)}"
             )
 
+        # Step 5b: Add strategy agent as participant in the channel
+        print(f"Adding agent {strategy_agent_id} to channel {eliza_channel_id}")
+        try:
+            add_agent_url = get_eliza_api_url(f"/api/messaging/central-channels/{eliza_channel_id}/agents")
+            agent_payload = {"agentId": strategy_agent_id}
+            agent_response = requests.post(add_agent_url, json=agent_payload, timeout=10)
+
+            if agent_response.ok:
+                print(f"Successfully added agent {strategy_agent_id} to channel {eliza_channel_id}")
+            else:
+                print(f"Warning: Failed to add agent to channel: {agent_response.status_code}")
+        except Exception as e:
+            print(f"Warning: Could not add agent to channel: {str(e)}")
+            # Continue - channel created, agent just not explicitly added
+
         # Step 6: Store room metadata in platform_rooms table
-        print(f"Storing room in database")
+        print("Storing room in database")
         try:
             supabase = create_supabase_client()
 
@@ -1174,7 +1214,7 @@ Keep it concise and actionable. Automatically include these guardrails:
                 "user_id": user_id,
                 "name": name,
                 "description": description,
-                "eliza_room_id": eliza_room_id,
+                "eliza_channel_id": eliza_channel_id,  # Updated column name
                 "strategy_agent_id": strategy_agent_id,
                 "wallet_address": wallet_address,
                 "smart_account_address": smart_account_address,
@@ -1200,7 +1240,7 @@ Keep it concise and actionable. Automatically include these guardrails:
             )
 
         # Step 7: Store strategy agent in platform_agents table
-        print(f"Storing strategy agent in database")
+        print("Storing strategy agent in database")
         try:
             agent_db_data = {
                 "user_id": user_id,
@@ -1217,27 +1257,27 @@ Keep it concise and actionable. Automatically include these guardrails:
             if not agent_result.data:
                 raise Exception("Supabase insert returned no data for platform_agents")
 
+            print(f"Successfully stored strategy agent {strategy_agent_id} in database")
+
         except Exception as e:
-            print(f"Warning: Failed to store strategy agent in database: {str(e)}")
-            # Continue - room is created, agent just not tracked in DB
+            # Log error - each room should have a unique agent now, so duplicates indicate a problem
+            print(f"ERROR: Failed to store strategy agent in database: {str(e)}")
+            print(f"Agent data: {agent_db_data}")
+            raise HTTPException(
+                status_code=500,
+                detail=f"Failed to store agent metadata: {str(e)}"
+            )
 
         # Step 8: Return success response
         return {
             "success": True,
-            "room": {
-                "id": db_room["id"],
-                "eliza_room_id": db_room["eliza_room_id"],
-                "name": db_room["name"],
-                "description": db_room["description"],
-                "user_id": db_room["user_id"],
-                "strategy_agent_id": db_room["strategy_agent_id"],
+            "data": {
+                "room_id": db_room["id"],
+                "eliza_room_id": db_room["eliza_channel_id"],
                 "wallet_address": db_room["wallet_address"],
                 "smart_account_address": db_room["smart_account_address"],
-                "user_prompt": db_room["user_prompt"],
                 "generated_strategy": db_room["generated_strategy"],
-                "frequency": db_room["frequency"],
-                "status": db_room["status"],
-                "created_at": db_room["created_at"],
+                "strategy_agent_id": db_room["strategy_agent_id"],
             }
         }
 
@@ -1247,8 +1287,8 @@ Keep it concise and actionable. Automatically include these guardrails:
 
     @web_app.post("/rooms/{room_id}/messages", status_code=201, tags=["Rooms"])
     async def send_message_to_room(
+        message_request: SendMessageRequest,
         room_id: str = PathParam(..., description="Room ID to send message to"),
-        message_request: SendMessageRequest = None,
     ):
         """
         Send a message to a room.
@@ -1271,39 +1311,40 @@ Keep it concise and actionable. Automatically include these guardrails:
         # Extract inputs
         content = message_request.content
         metadata = message_request.metadata or {}
+        user_id = message_request.user_id
 
-        # Build ElizaOS messaging payload
-        # Based on requirements and search results, the payload structure is:
-        # {
-        #   "channel_id": room_id,
-        #   "server_id": "00000000-0000-0000-0000-000000000000",
-        #   "author_id": <agent_id or system>,
-        #   "content": message_text,
-        #   "source_type": "agent_response",
-        #   "raw_message": {"text": message_text},
-        #   "metadata": {...}
-        # }
+        # Build ElizaOS messaging payload for central-channels API
+        # Based on OpenAPI spec: POST /api/messaging/central-channels/{channelId}/messages
+        # Required: author_id (UUID), content (string), server_id (UUID)
+        # Optional: in_reply_to_message_id, raw_message, metadata, source_type
 
-        # For system messages, we'll use a special author_id
-        # In a real implementation, you might want to extract agent_id from metadata
-        author_id = metadata.get("author_id", "system")
+        # Extract or generate author_id (must be UUID)
+        author_id = metadata.get("author_id") or metadata.get("senderId") or user_id
+
+        # Ensure author_id is a valid UUID format (if it's a username, use as metadata)
+        try:
+            import uuid
+            uuid.UUID(author_id)
+        except (ValueError, AttributeError):
+            # Not a UUID - create a consistent UUID from the user_id string
+            author_id = str(uuid.uuid5(uuid.NAMESPACE_DNS, f"user:{author_id}"))
 
         message_payload = {
-            "channel_id": room_id,
-            "server_id": "00000000-0000-0000-0000-000000000000",  # Default server ID
             "author_id": author_id,
             "content": content,
-            "source_type": metadata.get("source_type", "agent_response"),
-            "raw_message": {
-                "text": content,
-                **(metadata.get("raw_message", {}))
-            },
+            "server_id": "00000000-0000-0000-0000-000000000000",  # Central server ID
+            "source_type": metadata.get("source_type", "api"),
             "metadata": metadata,
         }
 
-        # POST to ElizaOS messaging endpoint
+        # Add optional raw_message if provided
+        if "raw_message" in metadata:
+            message_payload["raw_message"] = metadata["raw_message"]
+
+        # POST to ElizaOS central-channels messages endpoint
         try:
-            submit_url = get_eliza_api_url("/api/messaging/submit")
+            # Use room_id (which is the eliza_channel_id) in the URL path
+            submit_url = get_eliza_api_url(f"/api/messaging/central-channels/{room_id}/messages")
 
             submit_response = requests.post(
                 submit_url,
@@ -1379,85 +1420,37 @@ Keep it concise and actionable. Automatically include these guardrails:
                 detail="user_id is required and must be a non-empty string"
             )
 
-        # Get user's agents to filter rooms
+        # Query platform_rooms directly - we now store all data there
         try:
             supabase = create_supabase_client()
 
-            result = supabase.table("platform_agents").select("eliza_agent_id").eq(
+            # Get all rooms for this user from platform_rooms table
+            result = supabase.table("platform_rooms").select("*").eq(
                 "user_id", user_id
             ).execute()
 
-            user_agent_ids = [agent["eliza_agent_id"] for agent in (result.data or [])]
+            user_rooms = result.data or []
 
-            if not user_agent_ids:
-                # User has no agents, return empty list
-                return {
-                    "success": True,
-                    "rooms": [],
-                    "count": 0,
-                }
+            # Map database fields to API response format
+            # Database uses eliza_channel_id, but API exposes eliza_room_id for consistency
+            formatted_rooms = []
+            for room in user_rooms:
+                formatted_room = {**room}
+                # Add eliza_room_id mapping for frontend compatibility
+                if "eliza_channel_id" in formatted_room:
+                    formatted_room["eliza_room_id"] = formatted_room["eliza_channel_id"]
+                formatted_rooms.append(formatted_room)
 
         except Exception as e:
             raise HTTPException(
                 status_code=500,
-                detail=f"Failed to query user agents: {str(e)}"
-            )
-
-        # Query ElizaOS for rooms for each user agent
-        # Correct pattern: GET /api/agents/{agentId}/rooms (rooms are scoped to agents)
-        try:
-            user_rooms = []
-
-            # Query rooms for each of the user's agents
-            for agent_id in user_agent_ids:
-                try:
-                    list_url = get_eliza_api_url(f"/api/agents/{agent_id}/rooms")
-
-                    list_response = requests.get(list_url, timeout=30)
-
-                    if not list_response.ok:
-                        print(f"Failed to get rooms for agent {agent_id}: {list_response.status_code}")
-                        continue  # Skip this agent if rooms query fails
-
-                    agent_rooms_data = list_response.json()
-
-                    # ElizaOS returns: {"success": true, "data": {"rooms": [...]}}
-                    if agent_rooms_data.get("success"):
-                        rooms_list = agent_rooms_data.get("data", {}).get("rooms", [])
-
-                        for room in rooms_list:
-                            # Add room to user_rooms if not already there (avoid duplicates)
-                            room_id = room.get("id")
-                            if not any(r.get("id") == room_id for r in user_rooms):
-                                user_rooms.append({
-                                    "id": room_id,
-                                    "name": room.get("name"),
-                                    "source": room.get("source"),
-                                    "worldId": room.get("worldId"),
-                                    "entities": room.get("entities", []),
-                                })
-
-                except Exception as e:
-                    print(f"Error querying rooms for agent {agent_id}: {str(e)}")
-                    continue  # Skip this agent and continue with others
-
-        except requests.exceptions.RequestException as e:
-            raise HTTPException(
-                status_code=502,
-                detail=f"Failed to communicate with ElizaOS server: {str(e)}"
-            )
-        except HTTPException:
-            raise
-        except Exception as e:
-            raise HTTPException(
-                status_code=500,
-                detail=f"Failed to list rooms from ElizaOS: {str(e)}"
+                detail=f"Failed to query rooms: {str(e)}"
             )
 
         return {
             "success": True,
-            "rooms": user_rooms,
-            "count": len(user_rooms),
+            "data": formatted_rooms,
+            "count": len(formatted_rooms),
         }
 
     # ========================================================================
@@ -1493,16 +1486,25 @@ Keep it concise and actionable. Automatically include these guardrails:
         import os
 
         # Verify room exists in platform_rooms
+        # Support lookup by both internal ID and eliza_channel_id
         try:
             supabase = create_supabase_client()
 
+            # Try internal ID first
             result = supabase.table("platform_rooms").select("*").eq("id", room_id).execute()
+
+            # If not found, try eliza_channel_id
+            if not result.data:
+                result = supabase.table("platform_rooms").select("*").eq("eliza_channel_id", room_id).execute()
 
             if not result.data:
                 raise HTTPException(
                     status_code=404,
                     detail=f"Room not found: {room_id}"
                 )
+
+            # Use the resolved internal ID for Wallet API call
+            resolved_room_id = result.data[0]["id"]
 
         except HTTPException:
             raise
@@ -1526,9 +1528,9 @@ Keep it concise and actionable. Automatically include these guardrails:
             if status:
                 params["status"] = status
 
-            # Call Wallet API
+            # Call Wallet API using resolved internal room ID
             wallet_response = requests.get(
-                f"{wallet_api_url}/wallets/{room_id}/transactions",
+                f"{wallet_api_url}/wallets/{resolved_room_id}/transactions",
                 params=params,
                 timeout=30
             )

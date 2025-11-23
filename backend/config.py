@@ -285,9 +285,16 @@ def generate_character_config(
         },
         # Hardcoded plugins - not user-configurable
         "plugins": [
-            "@elizaos/plugin-sql",
+            "@elizaos/adapter-postgres",  # PostgreSQL adapter (no PGLite fallback)
             "@elizaos/plugin-openai",
-            "@elizaos/plugin-bootstrap"
+            "@elizaos/plugin-bootstrap",
+            "price-monitor",  # Custom price monitoring plugin
+            "trade-monitor"   # Custom trade activity monitoring plugin
+            # NOTE: Custom plugins need to be available to the ElizaOS server.
+            # For local development with backend/agentica, this works.
+            # For production Modal deployment, you need to either:
+            #   1. Publish as npm package and include in ElizaOS Docker image, or
+            #   2. Build custom Docker image with the plugin included
         ],
         # Hardcoded settings - not user-configurable
         "settings": {

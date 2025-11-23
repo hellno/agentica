@@ -14,8 +14,7 @@ enum SOCKET_MESSAGE_TYPE {
 }
 
 // Direct connection to ElizaOS server for Socket.IO (proxying doesn't work for WebSocket)
-const SOCKET_URL =
-  process.env.NEXT_PUBLIC_SERVER_URL || "http://localhost:3000";
+const SOCKET_URL = process.env.NEXT_PUBLIC_SERVER_URL || "http://localhost:3000";
 console.log("[SocketIO] Using server URL:", SOCKET_URL);
 
 // Enhanced types for ElizaOS Socket.IO events (matching official client)

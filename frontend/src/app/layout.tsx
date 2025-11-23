@@ -10,6 +10,22 @@ import { ProgressBar } from "@/app/progress-bar";
 import { Toaster } from "@/app/toaster";
 import { Header } from "@/components/header";
 
+import { Archivo_Black, Space_Grotesk } from "next/font/google";
+
+const archivoBlack = Archivo_Black({
+  subsets: ["latin"],
+  weight: "400",
+  variable: "--font-head",
+  display: "swap",
+});
+
+const space = Space_Grotesk({
+  subsets: ["latin"],
+  weight: "400",
+  variable: "--font-sans",
+  display: "swap",
+});
+
 export const viewport: Viewport = {
   width: "device-width",
   initialScale: 1,
@@ -18,11 +34,11 @@ export const viewport: Viewport = {
 
 export const metadata: Metadata = {
   metadataBase: new URL(siteConfig.url),
-  title: `${siteConfig.name} - Learn about the Eliza Agent Framework`,
+  title: `${siteConfig.name}`,
   description: siteConfig.description,
   openGraph: {
     siteName: siteConfig.name,
-    title: "The Documentation for Eliza",
+    title: "agentica",
     description: siteConfig.description,
     images: [siteConfig.ogImage],
     type: "website",
@@ -33,7 +49,7 @@ export const metadata: Metadata = {
   twitter: {
     card: "summary_large_image",
     site: siteConfig.name,
-    title: "The Documentation for Eliza",
+    title: "agentica",
     description: siteConfig.description,
     images: [siteConfig.ogImage],
     creator: siteConfig.creator,
@@ -47,16 +63,16 @@ export default function RootLayout({
 }>) {
   return (
     <html suppressHydrationWarning lang="en" className={inter.className}>
-      <body className="antialiased bg-white text-black scheme-light dark:bg-black dark:text-white dark:scheme-dark selection:!bg-[#fff0dd] dark:selection:!bg-[#3d2b15] overscroll-none">
+      <body
+        className={`${archivoBlack.variable} ${space.variable} antialiased bg-white text-black scheme-light dark:bg-black dark:text-white dark:scheme-dark selection:!bg-[#fff0dd] dark:selection:!bg-[#3d2b15] overscroll-none`}
+      >
         <ThemeProvider
           attribute="class"
           defaultTheme="system"
           enableSystem
           disableTransitionOnChange
         >
-          <MiniKitProvider>
-            {children}
-          </MiniKitProvider>
+          <MiniKitProvider>{children}</MiniKitProvider>
         </ThemeProvider>
         <FarcasterInit />
         <ProgressBar />

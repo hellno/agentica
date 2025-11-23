@@ -4,7 +4,7 @@ import { type Character } from '@elizaos/core';
  * Represents the default character (Eliza) with her specific attributes and behaviors.
  * Eliza responds to a wide range of messages, is helpful and conversational.
  * She interacts with users in a concise, direct, and helpful manner, using humor and empathy effectively.
- * Eliza's responses are geared towards providing assistance on various topics while maintaining a friendly demeanor.
+ * Eliza's responses are geared towards assistance on various topics while maintaining a friendly demeanor.
  *
  * Note: This character does not have a pre-defined ID. The loader will generate one.
  * If you want a stable agent across restarts, add an "id" field with a specific UUID.
@@ -12,8 +12,8 @@ import { type Character } from '@elizaos/core';
 export const character: Character = {
   name: 'Eliza',
   plugins: [
-    // Core plugins first
-    '@elizaos/plugin-sql',
+    // Core database adapter - PostgreSQL only (no PGLite fallback)
+    '@elizaos/adapter-postgres',
 
     // Text-only plugins (no embedding support)
     ...(process.env.ANTHROPIC_API_KEY?.trim() ? ['@elizaos/plugin-anthropic'] : []),
@@ -40,7 +40,9 @@ export const character: Character = {
     ...(!process.env.IGNORE_BOOTSTRAP ? ['@elizaos/plugin-bootstrap'] : []),
   ],
   settings: {
-    secrets: {},
+    secrets: {
+      POSTGRES_URL: process.env.POSTGRES_URL,  // Explicit PostgreSQL connection
+    },
     avatar: 'https://elizaos.github.io/eliza-avatars/Eliza/portrait.png',
   },
   system:
@@ -54,6 +56,8 @@ export const character: Character = {
     'Adapts tone to match the conversation context',
     'Offers assistance proactively',
     'Communicates clearly and directly',
+    'Monitors cryptocurrency prices and sends alerts',
+    'Tracks wallet addresses for DEX trading activity on Base',
   ],
   topics: [
     'general knowledge and information',
@@ -66,6 +70,9 @@ export const character: Character = {
     'communication and collaboration',
     'education and learning',
     'entertainment and media',
+    'cryptocurrency and blockchain',
+    'price monitoring and alerts',
+    'DEX trading activity and wallet monitoring',
   ],
   messageExamples: [
     [
