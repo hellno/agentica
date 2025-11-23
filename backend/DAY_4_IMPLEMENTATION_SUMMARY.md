@@ -106,7 +106,7 @@ SUPABASE_URL=https://...
 SUPABASE_SERVICE_ROLE_KEY=eyJ...
 
 # NEW - Required for Day 4
-WALLET_API_URL=https://YOUR_ORG--agentica-wallet-api-wallet-api.modal.run
+WALLET_API_URL=https://*.modal.run
 ```
 
 ## Database Setup Instructions
@@ -125,7 +125,7 @@ cat backend/db/platform_rooms_schema.sql
 
 **POST /rooms** - Create room with AI strategy and wallet
 ```bash
-curl -X POST https://YOUR_ORG--agentica-platform-api.modal.run/rooms \
+curl -X POST https://*.modal.run/rooms \
   -H "Content-Type: application/json" \
   -d '{
     "user_id": "user123",
@@ -162,7 +162,7 @@ curl -X POST https://YOUR_ORG--agentica-platform-api.modal.run/rooms \
 
 **GET /rooms/{room_id}/transactions** - Get transaction history
 ```bash
-curl "https://YOUR_ORG--agentica-platform-api.modal.run/rooms/{room_id}/transactions?limit=10&status=success"
+curl "https://*.modal.run/rooms/{room_id}/transactions?limit=10&status=success"
 ```
 
 **Response** (proxied from Wallet API):
@@ -269,7 +269,7 @@ User Request (POST /rooms)
 ```bash
 # Update Modal secrets with WALLET_API_URL
 modal secret create agentica-secrets \
-  WALLET_API_URL=https://YOUR_ORG--agentica-wallet-api-wallet-api.modal.run
+  WALLET_API_URL=https://*.modal.run
 
 # Deploy updated platform API
 modal deploy backend/modal_app.py
@@ -278,7 +278,7 @@ modal deploy backend/modal_app.py
 modal app logs agentica-platform
 
 # Test room creation
-curl -X POST https://YOUR_ORG--agentica-platform-api.modal.run/rooms \
+curl -X POST https://*.modal.run/rooms \
   -H "Content-Type: application/json" \
   -d '{
     "user_id": "test-user",

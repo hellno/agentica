@@ -68,7 +68,7 @@ export default async function Image() {
               margin: 0,
             }}
           >
-            your wallet that helps you sleep better
+            the wallet that helps you sleep better
           </p>
         </div>
       </div>

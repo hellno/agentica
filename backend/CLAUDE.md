@@ -30,7 +30,7 @@ modal run backend/modal_app.py
 modal app logs agentica-platform
 
 # Check health
-curl https://YOUR_ORG--agentica-platform-api.modal.run/health
+curl https://*.modal.run/health
 ```
 
 ### Secrets Management
@@ -57,7 +57,7 @@ modal secret create agentica-secrets \
    - Decorator: `@modal.web_server(port=3000)`
    - Starts ElizaOS with: `bun /app/packages/cli/dist/index.js start`
    - No `--characters` flag - agents added dynamically via API
-   - Exposes stable URL: `https://herocast--agentica-platform-eliza-server.modal.run`
+   - Exposes stable URL: `https://*.modal.run`
 
 2. **`api()`** - FastAPI application with all routes
    - Decorator: `@modal.asgi_app()`
@@ -96,7 +96,7 @@ modal secret create agentica-secrets \
 
 ## API Endpoints
 
-**Base URL:** `https://YOUR_ORG--agentica-platform-api.modal.run`
+**Base URL:** `https://*.modal.run`
 
 ### Agents
 - `POST /agents` - Create agent (requires `user_id`, `name`, `description`, optional `advanced_config`)
@@ -215,7 +215,7 @@ response = requests.post(
 
 ### Create Test Agent
 ```bash
-curl -X POST https://YOUR_ORG--agentica-platform-api.modal.run/agents \
+curl -X POST https://*.modal.run/agents \
   -H "Content-Type: application/json" \
   -d '{
     "user_id": "test-user-123",

@@ -53,7 +53,7 @@ def get_tunnel_url() -> str:
     # You can find it in the deployment output or Modal dashboard
     raise Exception(
         "ELIZA_SERVER_URL environment variable not set. "
-        "Please set it to your ElizaOS server URL (e.g., https://herocast--agentica-platform-eliza-server.modal.run)"
+        "Please set it to your ElizaOS server URL (e.g., https://*.modal.run)"
     )
 
 

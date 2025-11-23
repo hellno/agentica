@@ -151,5 +151,5 @@ def main():
     print("\nTo test:")
     print("  python backend/test_wallet_api_modal.py")
     print("\nAPI Documentation:")
-    print("  https://YOUR_ORG--agentica-wallet-api-wallet-api.modal.run/docs")
+    print("  https://*.modal.run/docs")
     print("="*80 + "\n")

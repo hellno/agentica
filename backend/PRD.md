@@ -1007,7 +1007,7 @@ modal deploy backend/modal_app.py
 **Demo Flow**:
 ```bash
 # 1. Create portfolio with natural language prompt (30 seconds)
-curl -X POST https://herocast--agentica-platform-api.modal.run/rooms \
+curl -X POST https://*.modal.run/rooms \
   -H "Content-Type: application/json" \
   -d '{
     "user_id": "demo_user",
@@ -1030,7 +1030,7 @@ curl -X POST https://herocast--agentica-platform-api.modal.run/rooms \
 # 3. Agent checks balance (1 minute)
 # (Agent automatically calls Wallet API in background)
 
-curl https://herocast--agentica-platform-api.modal.run/rooms/abc/transactions
+curl https://*.modal.run/rooms/abc/transactions
 # Shows: [{"action": "balance", "result": {"USDC": "1000"}, ...}]
 
 # 4. Execute transfer (1 minute)
@@ -1045,7 +1045,7 @@ curl -X POST http://localhost:8001/wallets/abc/transfer \
 # Response: {"success": true, "tx_hash": "0xdef...", ...}
 
 # 5. View history (30 seconds)
-curl https://herocast--agentica-platform-api.modal.run/rooms/abc/transactions
+curl https://*.modal.run/rooms/abc/transactions
 # Shows: [
 #   {"action": "balance", ...},
 #   {"action": "transfer", "tx_hash": "0xdef...", ...}

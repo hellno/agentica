@@ -8,7 +8,7 @@ Add the WALLET_API_URL to your Modal secrets:
 
 ```bash
 # Get your Wallet API URL first (if deployed)
-# Format: https://YOUR_ORG--agentica-wallet-api-wallet-api.modal.run
+# Format: https://*.modal.run
 
 # Update Modal secrets
 modal secret create agentica-secrets \
@@ -17,7 +17,7 @@ modal secret create agentica-secrets \
   SUPABASE_URL=https://... \
   SUPABASE_SERVICE_ROLE_KEY=eyJ... \
   SUPABASE_ANON_KEY=eyJ... \
-  WALLET_API_URL=https://YOUR_ORG--agentica-wallet-api-wallet-api.modal.run
+  WALLET_API_URL=https://*.modal.run
 ```
 
 ### 2. Run Database Schema
@@ -38,7 +38,7 @@ cat backend/db/platform_rooms_schema.sql
 modal deploy backend/modal_app.py
 
 # Wait for deployment to complete
-# Note the API URL: https://YOUR_ORG--agentica-platform-api.modal.run
+# Note the API URL: https://*.modal.run
 ```
 
 ## Testing Steps
@@ -47,7 +47,7 @@ modal deploy backend/modal_app.py
 
 ```bash
 # Replace YOUR_ORG with your actual Modal organization
-export PLATFORM_API_URL="https://YOUR_ORG--agentica-platform-api.modal.run"
+export PLATFORM_API_URL="https://*.modal.run"
 
 # Create a test room
 curl -X POST "$PLATFORM_API_URL/rooms" \
@@ -180,7 +180,7 @@ curl "$PLATFORM_API_URL/rooms/$ROOM_ID/transactions?limit=10" | jq '.'
 Test that transactions appear in history:
 
 ```bash
-export WALLET_API_URL="https://YOUR_ORG--agentica-wallet-api-wallet-api.modal.run"
+export WALLET_API_URL="https://*.modal.run"
 
 # Execute a balance check (creates transaction log)
 curl -X POST "$WALLET_API_URL/wallets/$ROOM_ID/balance" \
@@ -308,7 +308,7 @@ curl -X POST "$PLATFORM_API_URL/rooms" \
 ```bash
 # Update Modal secrets with WALLET_API_URL
 modal secret create agentica-secrets \
-  WALLET_API_URL=https://YOUR_ORG--agentica-wallet-api-wallet-api.modal.run
+  WALLET_API_URL=https://*.modal.run
 
 # Redeploy
 modal deploy backend/modal_app.py
@@ -334,7 +334,7 @@ modal secret list
 **Solution**:
 ```bash
 # Check Wallet API status
-curl https://YOUR_ORG--agentica-wallet-api-wallet-api.modal.run/health
+curl https://*.modal.run/health
 
 # Verify WALLET_API_URL matches deployed URL
 modal secret list
@@ -378,9 +378,9 @@ Once all tests pass:
 
 ## Reference
 
-- Platform API: `https://YOUR_ORG--agentica-platform-api.modal.run`
-- Wallet API: `https://YOUR_ORG--agentica-wallet-api-wallet-api.modal.run`
-- API Docs: `https://YOUR_ORG--agentica-platform-api.modal.run/docs`
+- Platform API: `https://*.modal.run`
+- Wallet API: `https://*.modal.run`
+- API Docs: `https://*.modal.run/docs`
 - Database: Supabase SQL Editor
 
 ## Log Monitoring

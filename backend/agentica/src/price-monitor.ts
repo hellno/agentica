@@ -94,18 +94,22 @@ export class PriceMonitorService extends Service {
 
   private async initialize(): Promise<void> {
     try {
+      logger.info('🚀 [PRICE-MONITOR] Starting initialization...');
+
       // Load configuration from memory
       await this.loadConfig();
+      logger.info({ config: this.serviceConfig }, '📋 [PRICE-MONITOR] Configuration loaded');
 
       // Load price states from memory
       await this.loadPriceStates();
+      logger.info({ stateCount: this.priceStates.size }, '💾 [PRICE-MONITOR] Price states loaded');
 
       // Start polling
       this.startPolling();
 
-      logger.info({ config: this.config }, 'Price Monitor Service initialized');
+      logger.info({ config: this.serviceConfig }, '✅ [PRICE-MONITOR] Service initialized successfully');
     } catch (error) {
-      logger.error({ error }, 'Failed to initialize Price Monitor Service');
+      logger.error({ error }, '❌ [PRICE-MONITOR] Failed to initialize');
       throw error;
     }
   }
@@ -286,25 +290,31 @@ export class PriceMonitorService extends Service {
   }
 
   async checkPrices(): Promise<void> {
+    logger.info({ tokenCount: this.serviceConfig.tokens.length }, '⏰ [PRICE-MONITOR] checkPrices() called');
+
     if (this.serviceConfig.tokens.length === 0) {
-      logger.debug('No tokens configured for monitoring');
+      logger.warn('⚠️ [PRICE-MONITOR] No tokens configured for monitoring');
       return;
     }
 
     try {
       const prices = await this.fetchPrices();
+      logger.info({ prices, tokenCount: Object.keys(prices).length }, '📊 [PRICE-MONITOR] Got prices, processing updates...');
 
       for (const token of this.serviceConfig.tokens) {
         const currentPrice = prices[token];
         if (!currentPrice) {
-          logger.warn({ token }, 'No price data for token');
+          logger.warn({ token }, '⚠️ [PRICE-MONITOR] No price data for token');
           continue;
         }
 
+        logger.info({ token, currentPrice }, '🔄 [PRICE-MONITOR] Processing price update');
         await this.processPriceUpdate(token, currentPrice);
       }
+
+      logger.info('✅ [PRICE-MONITOR] Price check completed');
     } catch (error) {
-      logger.error({ error }, 'Failed to check prices');
+      logger.error({ error }, '❌ [PRICE-MONITOR] Failed to check prices');
     }
   }
 
@@ -312,24 +322,28 @@ export class PriceMonitorService extends Service {
     const tokenIds = this.serviceConfig.tokens.join(',');
     const url = `${COINGECKO_API_BASE}/simple/price?ids=${tokenIds}&vs_currencies=usd`;
 
+    logger.info({ url, tokens: tokenIds }, '🌐 [PRICE-MONITOR] Fetching prices from CoinGecko...');
+
     try {
       const response = await fetch(url);
 
       if (!response.ok) {
+        logger.error({ status: response.status, statusText: response.statusText }, '❌ [PRICE-MONITOR] CoinGecko API error');
         throw new Error(`CoinGecko API error: ${response.status} ${response.statusText}`);
       }
 
       const data = (await response.json()) as CoinGeckoPriceResponse;
+      logger.info({ data }, '📦 [PRICE-MONITOR] Received data from CoinGecko');
 
       const prices: Record<string, number> = {};
       for (const [token, priceData] of Object.entries(data)) {
         prices[token] = priceData.usd;
       }
 
-      logger.debug({ prices }, 'Fetched current prices');
+      logger.info({ prices }, '💰 [PRICE-MONITOR] Parsed prices successfully');
       return prices;
     } catch (error) {
-      logger.error({ error }, 'Failed to fetch prices from CoinGecko');
+      logger.error({ error }, '❌ [PRICE-MONITOR] Failed to fetch prices');
       throw error;
     }
   }
@@ -408,19 +422,21 @@ export class PriceMonitorService extends Service {
 
     const alertText = `🚨 ${tokenName} Price Alert: ${formattedPrice} ${direction}${formattedChange}%`;
 
-    logger.info({ token, price, changePercent }, 'Sending price alert');
+    logger.info({ token, price, changePercent, alertText }, '🚨 [PRICE-MONITOR] Preparing to send price alert');
 
     try {
       // Get all rooms the agent is in (returns UUID[])
       const roomIds = await this.runtime.getRoomsForParticipant(this.runtime.agentId);
+      logger.info({ roomIds, roomCount: roomIds?.length || 0 }, '📍 [PRICE-MONITOR] Got rooms for agent');
 
       if (!roomIds || roomIds.length === 0) {
-        logger.debug('No rooms found to send alerts to');
+        logger.warn('⚠️ [PRICE-MONITOR] No rooms found to send alerts to');
         return;
       }
 
       // Send alert to each room
       for (const roomId of roomIds) {
+        logger.info({ roomId, alertText }, '📤 [PRICE-MONITOR] Sending alert to room');
         await this.runtime.createMemory(
           {
             id: crypto.randomUUID(),
@@ -436,11 +452,12 @@ export class PriceMonitorService extends Service {
           },
           'messages'
         );
+        logger.info({ roomId }, '✅ [PRICE-MONITOR] Alert sent to room');
       }
 
-      logger.info({ roomCount: roomIds.length, alertText }, 'Alert broadcast complete');
+      logger.info({ roomCount: roomIds.length, alertText }, '✅ [PRICE-MONITOR] Alert broadcast complete');
     } catch (error) {
-      logger.error({ error }, 'Failed to broadcast alert');
+      logger.error({ error }, '❌ [PRICE-MONITOR] Failed to broadcast alert');
     }
   }
 
@@ -485,6 +502,8 @@ const configureMonitorAction: Action = {
   validate: async (_runtime: IAgentRuntime, message: Memory, _state: State): Promise<boolean> => {
     const text = message.content.text?.toLowerCase() || '';
 
+    logger.info({ text }, '🔍 [CONFIGURE_PRICE_MONITOR] Validating message...');
+
     // Trigger on monitoring-related keywords
     const keywords = [
       'monitor',
@@ -499,7 +518,10 @@ const configureMonitorAction: Action = {
       'threshold',
     ];
 
-    return keywords.some((keyword) => text.includes(keyword));
+    const matched = keywords.some((keyword) => text.includes(keyword));
+    logger.info({ text, matched, keywords }, `${matched ? '✅' : '❌'} [CONFIGURE_PRICE_MONITOR] Validation result`);
+
+    return matched;
   },
 
   handler: async (
@@ -510,7 +532,7 @@ const configureMonitorAction: Action = {
     callback: HandlerCallback
   ): Promise<ActionResult> => {
     try {
-      logger.info('Handling CONFIGURE_PRICE_MONITOR action');
+      logger.info({ messageText: message.content.text }, '🎯 [CONFIGURE_PRICE_MONITOR] Handler called');
 
       const service = runtime.getService<PriceMonitorService>(
         PriceMonitorService.serviceType
@@ -699,14 +721,16 @@ const monitorStatusAction: Action = {
   validate: async (_runtime: IAgentRuntime, message: Memory, _state: State): Promise<boolean> => {
     const text = message.content.text?.toLowerCase() || '';
 
+    logger.info({ text }, '🔍 [MONITOR_STATUS] Validating message...');
+
     // Trigger on status check keywords
-    return (
-      (text.includes('monitor') || text.includes('price') || text.includes('watch')) &&
-      (text.includes('status') ||
-        text.includes('what') ||
-        text.includes('show') ||
-        text.includes('list'))
-    );
+    const hasMonitorKeyword = text.includes('monitor') || text.includes('price') || text.includes('watch');
+    const hasStatusKeyword = text.includes('status') || text.includes('what') || text.includes('show') || text.includes('list');
+    const matched = hasMonitorKeyword && hasStatusKeyword;
+
+    logger.info({ text, hasMonitorKeyword, hasStatusKeyword, matched }, `${matched ? '✅' : '❌'} [MONITOR_STATUS] Validation result`);
+
+    return matched;
   },
 
   handler: async (
@@ -717,7 +741,7 @@ const monitorStatusAction: Action = {
     callback: HandlerCallback
   ): Promise<ActionResult> => {
     try {
-      logger.info('Handling MONITOR_STATUS action');
+      logger.info({ messageText: message.content.text }, '🎯 [MONITOR_STATUS] Handler called');
 
       const service = runtime.getService<PriceMonitorService>(
         PriceMonitorService.serviceType

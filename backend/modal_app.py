@@ -171,9 +171,9 @@ eliza_image = (
         # Disable SSL certificate verification for Supabase pooler connections
         "NODE_TLS_REJECT_UNAUTHORIZED": "0",
         # ElizaOS server URL for health checks and inter-service communication
-        "ELIZA_SERVER_URL": "https://herocast--agentica-platform-eliza-server.modal.run",
+        "ELIZA_SERVER_URL": "https://*.modal.run",
         # Wallet API URL for autonomous trading actions
-        "WALLET_API_URL": "https://herocast--agentica-wallet-api.modal.run",
+        "WALLET_API_URL": "https://*.modal.run",
     })
     # Install Python dependencies for config.py
     .pip_install(
@@ -197,7 +197,7 @@ api_image = (
     # Set ElizaOS server URL for API to communicate with ElizaOS
     # This is the stable Modal URL for the eliza_server function
     .env({
-        "ELIZA_SERVER_URL": "https://herocast--agentica-platform-eliza-server.modal.run"
+        "ELIZA_SERVER_URL": "https://*.modal.run"
     })
     # Add config.py to the image so it's importable (must be last)
     .add_local_file("backend/config.py", "/root/config.py")
@@ -1624,8 +1624,8 @@ def main():
     """
     print("AI Agent Launchpad - Agentica Platform")
     print("\nDeployed URLs:")
-    print("\n✓ ElizaOS Server: https://herocast--agentica-platform-eliza-server.modal.run")
-    print("✓ API Base URL: https://herocast--agentica-platform-api.modal.run")
+    print("\n✓ ElizaOS Server: https://*.modal.run")
+    print("✓ API Base URL: https://*.modal.run")
     print("\nAPI Endpoints:")
     print("  GET    /health - Health check")
     print("  POST   /agents - Create a new agent")

@@ -44,14 +44,14 @@ modal deploy backend/modal_app.py
 
 ## Usage
 
-**Base API URL:** `https://YOUR_ORG--agentica-platform-api.modal.run`
+**Base API URL:** `https://*.modal.run`
 
 All endpoints are now under a single FastAPI application.
 
 ### Create Your First Agent
 
 ```bash
-curl -X POST https://YOUR_ORG--agentica-platform-api.modal.run/agents \
+curl -X POST https://*.modal.run/agents \
   -H "Content-Type: application/json" \
   -d '{
     "user_id": "my-user-id",
@@ -63,13 +63,13 @@ curl -X POST https://YOUR_ORG--agentica-platform-api.modal.run/agents \
 ### List Your Agents
 
 ```bash
-curl "https://YOUR_ORG--agentica-platform-api.modal.run/agents?user_id=my-user-id"
+curl "https://*.modal.run/agents?user_id=my-user-id"
 ```
 
 ### Delete an Agent
 
 ```bash
-curl -X DELETE "https://YOUR_ORG--agentica-platform-api.modal.run/agents/AGENT_ID?user_id=my-user-id"
+curl -X DELETE "https://*.modal.run/agents/AGENT_ID?user_id=my-user-id"
 ```
 
 ## What's Included
@@ -128,7 +128,7 @@ tunnel_url = get_tunnel_url()  # from config.py
 You can provide advanced configuration options:
 
 ```bash
-curl -X POST https://YOUR_ORG--agentica-platform-api.modal.run/agents \
+curl -X POST https://*.modal.run/agents \
   -H "Content-Type: application/json" \
   -d '{
     "user_id": "my-user-id",
@@ -162,7 +162,7 @@ modal app logs agentica-platform
 modal run backend/modal_app.py
 
 # Health check (new unified API)
-curl https://YOUR_ORG--agentica-platform-api.modal.run/health
+curl https://*.modal.run/health
 ```
 
 ## Troubleshooting
