@@ -16,8 +16,14 @@ Architecture:
     - All handlers receive room_id, params dict, and cdp_client
 """
 
-from typing import Dict, Any, List
+import logging
+from typing import Any, Dict
+
 from fastapi import HTTPException, status
+
+# Set up logger
+logger = logging.getLogger(__name__)
+logger.setLevel(logging.INFO)
 
 # Token address mapping for Base Mainnet
 # Maps token symbols to their contract addresses
@@ -27,6 +33,7 @@ TOKEN_ADDRESSES = {
     "USDC": "0x833589fCD6eDb6E08f4c7C32D4f71b54bdA02913",  # USD Coin
     "DAI": "0x50c5725949A6F0c72E6C4a641F24049A917DB0Cb",   # Dai Stablecoin
     "USDT": "0xfde4C96c8593536E31F229EA8f37b2ADa2699bb2",  # Tether USD
+    "WBTC": "0x0555E30da8f98308EdB960aa94C0Db47230d2B9c"
     # Add more tokens as needed
 }
 
@@ -43,16 +50,22 @@ def resolve_token_address(token: str) -> str:
     Raises:
         HTTPException: If token symbol not found
     """
+    logger.info(f"🔍 [TOKEN-RESOLVE] Resolving token: {token}")
+
     # If already an address (starts with 0x), return as-is
     if token.startswith("0x"):
+        logger.info(f"✅ [TOKEN-RESOLVE] Token is already an address: {token}")
         return token
 
     # Convert symbol to uppercase and look up address
     symbol = token.upper()
     if symbol in TOKEN_ADDRESSES:
-        return TOKEN_ADDRESSES[symbol]
+        address = TOKEN_ADDRESSES[symbol]
+        logger.info(f"✅ [TOKEN-RESOLVE] Resolved {symbol} → {address}")
+        return address
 
     # Token not found
+    logger.error(f"❌ [TOKEN-RESOLVE] Unknown token: {token}")
     raise HTTPException(
         status_code=status.HTTP_400_BAD_REQUEST,
         detail=f"Unknown token: {token}. Supported tokens: {', '.join(TOKEN_ADDRESSES.keys())}"
@@ -84,10 +97,13 @@ async def handle_balance(room_id: str, params: Dict[str, Any], cdp_client) -> Di
     """
     from wallet_api.database import get_wallet
 
+    logger.info(f"💰 [BALANCE] Handling balance request for room_id: {room_id}")
+
     try:
         # Retrieve wallet from database
         wallet = await get_wallet(room_id)
         if not wallet:
+            logger.error(f"❌ [BALANCE] Wallet not found for room_id: {room_id}")
             raise HTTPException(
                 status_code=status.HTTP_404_NOT_FOUND,
                 detail=f"Wallet not found for room_id: {room_id}"
@@ -101,6 +117,8 @@ async def handle_balance(room_id: str, params: Dict[str, Any], cdp_client) -> Di
         if not smart_account_address:
             smart_account_address = wallet.get("address")
 
+        logger.info(f"✅ [BALANCE] Found wallet - Address: {smart_account_address}, Account: {owner_account_name}")
+
         # Return balance information
         return {
             "address": smart_account_address,
@@ -113,6 +131,7 @@ async def handle_balance(room_id: str, params: Dict[str, Any], cdp_client) -> Di
         # Re-raise HTTP exceptions as-is
         raise
     except Exception as e:
+        logger.error(f"❌ [BALANCE] Failed to retrieve balance: {str(e)}")
         # Catch-all for unexpected errors
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
@@ -196,9 +215,10 @@ async def handle_transfer(room_id: str, params: Dict[str, Any], cdp_client) -> D
 
         # Send user operation (gas-sponsored!)
         try:
+            from decimal import Decimal
+
             from cdp.evm_call_types import EncodedCall
             from web3 import Web3
-            from decimal import Decimal
 
             user_operation = await cdp_client.evm.send_user_operation(
                 smart_account=smart_account,
@@ -223,7 +243,7 @@ async def handle_transfer(room_id: str, params: Dict[str, Any], cdp_client) -> D
                 smart_account_address=smart_account.address,
                 user_op_hash=user_operation.user_op_hash
             )
-        except Exception as e:
+        except Exception:
             # Return partial response if confirmation fails
             return {
                 "user_op_hash": user_operation.user_op_hash,
@@ -290,6 +310,9 @@ async def handle_swap(room_id: str, params: Dict[str, Any], cdp_client) -> Dict[
     """
     from wallet_api.database import get_wallet
 
+    logger.info(f"🔄 [SWAP] Initiating swap for room_id: {room_id}")
+    logger.info(f"📋 [SWAP] Parameters: from_token={params.get('from_token')}, to_token={params.get('to_token')}, amount={params.get('amount')}, slippage_bps={params.get('slippage_bps', 100)}")
+
     # Validate required parameters
     from_token = params.get("from_token")
     to_token = params.get("to_token")
@@ -297,18 +320,21 @@ async def handle_swap(room_id: str, params: Dict[str, Any], cdp_client) -> Dict[
     slippage_bps = params.get("slippage_bps", 100)  # Default: 1% slippage
 
     if not from_token:
+        logger.error("❌ [SWAP] Missing from_token parameter")
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
             detail="Missing required parameter: from_token"
         )
 
     if not to_token:
+        logger.error("❌ [SWAP] Missing to_token parameter")
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
             detail="Missing required parameter: to_token"
         )
 
     if not amount:
+        logger.error("❌ [SWAP] Missing amount parameter")
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
             detail="Missing required parameter: amount"
@@ -317,9 +343,11 @@ async def handle_swap(room_id: str, params: Dict[str, Any], cdp_client) -> Dict[
     # Resolve token symbols to addresses (supports both symbols like "USDC" and addresses like "0x833...")
     from_token_address = resolve_token_address(from_token)
     to_token_address = resolve_token_address(to_token)
+    logger.info(f"✅ [SWAP] Token resolution complete: {from_token} → {from_token_address}, {to_token} → {to_token_address}")
 
     try:
         # Retrieve wallet from database
+        logger.info(f"🔍 [SWAP] Retrieving wallet for room_id: {room_id}")
         wallet = await get_wallet(room_id)
         if not wallet:
             raise HTTPException(
@@ -365,11 +393,12 @@ async def handle_swap(room_id: str, params: Dict[str, Any], cdp_client) -> Dict[
 
         if from_token_address.lower() != "0x0000000000000000000000000000000000000000":  # Not native ETH
             try:
+                logger.info(f"✍️ [SWAP] Approving Permit2 for token: {from_token_address}, amount: {amount}")
                 from cdp.evm_call_types import EncodedCall
-                from web3 import Web3
 
                 # Encode ERC20 approve(address spender, uint256 amount) call using Web3 ABI encoder
                 from eth_abi import encode
+                from web3 import Web3
 
                 # ERC20 approve function: approve(address spender, uint256 amount)
                 # Function selector: 0x095ea7b3
@@ -380,8 +409,10 @@ async def handle_swap(room_id: str, params: Dict[str, Any], cdp_client) -> Dict[
                     [Web3.to_checksum_address(permit2_address), int(amount) * 10]
                 ).hex()
                 approve_data = function_selector + encoded_params
+                logger.info(f"📝 [SWAP] Approval data encoded: {approve_data[:66]}...")
 
                 # Send approval user operation with gas sponsorship
+                logger.info(f"📤 [SWAP] Sending approval user operation with paymaster: {paymaster_url is not None}")
                 approval_op = await cdp_client.evm.send_user_operation(
                     smart_account=smart_account,
                     network="base",
@@ -394,21 +425,30 @@ async def handle_swap(room_id: str, params: Dict[str, Any], cdp_client) -> Dict[
                     ],
                     paymaster_url=paymaster_url  # Gas sponsorship
                 )
+                logger.info(f"✅ [SWAP] Approval operation sent - user_op_hash: {approval_op.user_op_hash}")
 
                 # Wait for approval confirmation
+                logger.info(f"⏳ [SWAP] Waiting for approval confirmation...")
                 await cdp_client.evm.wait_for_user_operation(
                     smart_account_address=smart_account.address,
                     user_op_hash=approval_op.user_op_hash
                 )
+                logger.info(f"✅ [SWAP] Approval confirmed!")
 
             except Exception as e:
+                logger.error(f"❌ [SWAP] Failed to approve Permit2: {str(e)}")
                 raise HTTPException(
                     status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
                     detail=f"Failed to approve Permit2: {str(e)}"
                 )
+        else:
+            logger.info(f"ℹ️ [SWAP] Skipping approval for native ETH")
 
         # Step 2: Execute swap
         try:
+            logger.info(f"🔄 [SWAP] Preparing swap execution...")
+            logger.info(f"📊 [SWAP] Swap details: {from_token_address} → {to_token_address}, amount: {amount}, slippage: {slippage_bps}bps")
+
             # Import SmartAccountSwapOptions
             from cdp.actions.evm.swap import SmartAccountSwapOptions
 
@@ -424,16 +464,23 @@ async def handle_swap(room_id: str, params: Dict[str, Any], cdp_client) -> Dict[
             # Add paymaster URL if available for gas sponsorship
             if paymaster_url:
                 swap_options.paymaster_url = paymaster_url
+                logger.info(f"⛽ [SWAP] Using paymaster for gas sponsorship")
+            else:
+                logger.warning(f"⚠️ [SWAP] No paymaster URL configured - user will pay gas")
 
+            logger.info(f"📤 [SWAP] Executing swap via CDP Trade API...")
             result = await smart_account.swap(swap_options)
 
             user_op_hash = result.user_op_hash
+            logger.info(f"✅ [SWAP] Swap submitted - user_op_hash: {user_op_hash}")
 
             # Store swap details for response
             swap_from_amount = str(amount)
             swap_to_amount = getattr(result, 'to_amount', None)
+            logger.info(f"💱 [SWAP] Expected output: {swap_to_amount} {to_token}")
 
         except Exception as e:
+            logger.error(f"❌ [SWAP] Failed to execute swap: {str(e)}")
             raise HTTPException(
                 status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
                 detail=f"Failed to execute swap: {str(e)}"
@@ -441,8 +488,11 @@ async def handle_swap(room_id: str, params: Dict[str, Any], cdp_client) -> Dict[
 
         # Wait for confirmation
         try:
+            logger.info(f"⏳ [SWAP] Waiting for transaction confirmation...")
             receipt = await smart_account.wait_for_user_operation(user_op_hash=user_op_hash)
+            logger.info(f"✅ [SWAP] Transaction confirmed - status: {receipt.status}")
         except Exception as e:
+            logger.warning(f"⚠️ [SWAP] Confirmation timeout or error: {str(e)}")
             # Return partial response if confirmation fails
             return {
                 "user_op_hash": user_op_hash,
@@ -458,6 +508,9 @@ async def handle_swap(room_id: str, params: Dict[str, Any], cdp_client) -> Dict[
         # Return success response
         transaction_hash = receipt.transaction_hash if receipt.status == "complete" else None
         block_explorer = f"https://basescan.org/tx/{transaction_hash}" if transaction_hash else None  # Base Mainnet
+
+        logger.info(f"🎉 [SWAP] Swap complete! Transaction: {transaction_hash}")
+        logger.info(f"🔗 [SWAP] Block explorer: {block_explorer}")
 
         return {
             "user_op_hash": user_op_hash,

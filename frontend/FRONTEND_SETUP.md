@@ -60,8 +60,8 @@ cp .env.example .env
 
 ```bash
 # Get these from Modal deployment
-NEXT_PUBLIC_SERVER_URL=https://YOUR_ORG--agentica-platform-eliza-server.modal.run
-NEXT_PUBLIC_PLATFORM_API_URL=https://YOUR_ORG--agentica-platform-api.modal.run
+NEXT_PUBLIC_SERVER_URL=https://*.modal.run
+NEXT_PUBLIC_PLATFORM_API_URL=https://*.modal.run
 ```
 
 **How to find your Modal URLs:**
@@ -71,7 +71,7 @@ modal deploy backend/modal_app.py
 
 # Look for output like:
 # ✓ Web app created.
-# └── https://YOUR_ORG--agentica-platform-api.modal.run
+# └── https://*.modal.run
 ```
 
 ### 2. Integrate Your Auth Provider

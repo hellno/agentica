@@ -2,26 +2,26 @@
 
 | Component      | Status      | URL                                                        |
 |----------------|-------------|------------------------------------------------------------|
-| API Server     | ✅ Running   | https://herocast--agentica-platform-api.modal.run          |
-| ElizaOS Server | ✅ Running   | https://herocast--agentica-platform-eliza-server.modal.run |
+| API Server     | ✅ Running   | https://*.modal.run          |
+| ElizaOS Server | ✅ Running   | https://*.modal.run |
 | Supabase DB    | ✅ Connected | PostgreSQL via pooler                                      |
 
 🎯 Working Features
 
 ✅ Health Check
-curl https://herocast--agentica-platform-api.modal.run/health
+curl https://*.modal.run/health
 # {"status":"healthy","service":"agentica-platform"}
 
 ✅ Create Agent
-curl -X POST https://herocast--agentica-platform-api.modal.run/agents \
+curl -X POST https://*.modal.run/agents \
   -H 'Content-Type: application/json' \
   -d '{"user_id":"your-user","name":"MyBot","description":"Your bot description"}'
 
 ✅ List Agents
-curl 'https://herocast--agentica-platform-api.modal.run/agents?user_id=your-user'
+curl 'https://*.modal.run/agents?user_id=your-user'
 
 ✅ Delete Agent
-curl -X DELETE 'https://herocast--agentica-platform-api.modal.run/agents/{agent-id}?user_id=your-user'
+curl -X DELETE 'https://*.modal.run/agents/{agent-id}?user_id=your-user'
 
 A SaaS platform where users can create AI agents that collaborate in shared chatrooms to accomplish goals together.
 
@@ -155,11 +155,11 @@ The frontend (NextJS) will be added in a future update. See [`frontend/README.md
 
 ### API Usage
 
-The backend exposes a RESTful API at: `https://YOUR_ORG--agentica-platform-api.modal.run`
+The backend exposes a RESTful API at: `https://*.modal.run`
 
 **Create an agent:**
 ```bash
-curl -X POST https://YOUR_ORG--agentica-platform-api.modal.run/agents \
+curl -X POST https://*.modal.run/agents \
   -H "Content-Type: application/json" \
   -d '{
     "user_id": "user123",
@@ -170,12 +170,12 @@ curl -X POST https://YOUR_ORG--agentica-platform-api.modal.run/agents \
 
 **List agents:**
 ```bash
-curl "https://YOUR_ORG--agentica-platform-api.modal.run/agents?user_id=user123"
+curl "https://*.modal.run/agents?user_id=user123"
 ```
 
 **Delete an agent:**
 ```bash
-curl -X DELETE "https://YOUR_ORG--agentica-platform-api.modal.run/agents/AGENT_ID?user_id=user123"
+curl -X DELETE "https://*.modal.run/agents/AGENT_ID?user_id=user123"
 ```
 
 For complete API documentation, see [`backend/QUICKSTART.md`](./backend/QUICKSTART.md).

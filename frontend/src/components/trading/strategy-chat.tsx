@@ -16,6 +16,41 @@ interface StrategyChatProps {
 const USER_NAME = "user"; // Match ElizaOS admin UI format
 const CHAT_SOURCE = "client_group_chat"; // Match ElizaOS admin UI format
 
+// Convert wallet address to UUID v5 (matches server-side conversion)
+async function convertWalletToUUID(walletAddress: string): Promise<string> {
+  const encoder = new TextEncoder();
+  const data = encoder.encode(`user:${walletAddress}`);
+  const hashBuffer = await crypto.subtle.digest("SHA-1", data);
+  const hashArray = Array.from(new Uint8Array(hashBuffer));
+
+  // UUID v5 format: xxxxxxxx-xxxx-5xxx-yxxx-xxxxxxxxxxxx
+  hashArray[6] = (hashArray[6] & 0x0f) | 0x50; // Version 5
+  hashArray[8] = (hashArray[8] & 0x3f) | 0x80; // Variant
+
+  return [
+    hashArray
+      .slice(0, 4)
+      .map((b) => b.toString(16).padStart(2, "0"))
+      .join(""),
+    hashArray
+      .slice(4, 6)
+      .map((b) => b.toString(16).padStart(2, "0"))
+      .join(""),
+    hashArray
+      .slice(6, 8)
+      .map((b) => b.toString(16).padStart(2, "0"))
+      .join(""),
+    hashArray
+      .slice(8, 10)
+      .map((b) => b.toString(16).padStart(2, "0"))
+      .join(""),
+    hashArray
+      .slice(10, 16)
+      .map((b) => b.toString(16).padStart(2, "0"))
+      .join(""),
+  ].join("-");
+}
+
 export default function StrategyChat({ room, userEntity }: StrategyChatProps) {
   const [messages, setMessages] = useState<ChatMessage[]>([]);
   const [input, setInput] = useState("");
@@ -116,11 +151,20 @@ export default function StrategyChat({ room, userEntity }: StrategyChatProps) {
   useEffect(() => {
     if (!room) return;
 
-    const handleMessageBroadcast = (data: any) => {
+    const handleMessageBroadcast = async (data: any) => {
       console.log("[StrategyChat] Message broadcast:", data);
 
+      // Convert wallet to UUID for comparison (server sends UUID as senderId)
+      const userUUID = await convertWalletToUUID(userEntity);
+
       // Skip own messages to avoid duplicates
-      if (data.senderId === userEntity) return;
+      // Compare both wallet address AND UUID (server might send either)
+      if (data.senderId === userEntity || data.senderId === userUUID) {
+        console.log(
+          `[StrategyChat] Socket.IO: Filtering own message (senderId=${data.senderId}, userEntity=${userEntity}, userUUID=${userUUID})`,
+        );
+        return;
+      }
 
       // Only show messages for current room
       if (data.channelId !== room.eliza_room_id) return;
@@ -164,6 +208,20 @@ export default function StrategyChat({ room, userEntity }: StrategyChatProps) {
 
           if (latestMessages.length === 0) return;
 
+          // Convert wallet address to UUID for comparison
+          const userUUID = await convertWalletToUUID(userEntity);
+
+          console.log("[StrategyChat] Polling debug:", {
+            userEntity,
+            userUUID,
+            messagesCount: latestMessages.length,
+            sampleAuthorIds: latestMessages.slice(0, 3).map((m: any) => ({
+              id: m.id,
+              authorId: m.authorId,
+              content: m.content?.slice(0, 20),
+            })),
+          });
+
           // Use functional setState to access current messages without dependency
           setMessages((currentMessages) => {
             // Get IDs of current messages
@@ -174,11 +232,24 @@ export default function StrategyChat({ room, userEntity }: StrategyChatProps) {
             const newMessages = latestMessages
               .filter((msg: any) => {
                 // Skip if message already exists (by ID)
-                if (currentMessageIds.has(msg.id)) return false;
+                if (currentMessageIds.has(msg.id)) {
+                  console.log(
+                    `[StrategyChat] Skipping duplicate message by ID: ${msg.id}`,
+                  );
+                  return false;
+                }
 
-                // Skip own messages to avoid duplicates (same as Socket.IO filter)
-                if (msg.authorId === userEntity) return false;
+                // Skip own messages to avoid duplicates (compare UUID to UUID)
+                if (msg.authorId === userUUID) {
+                  console.log(
+                    `[StrategyChat] Filtering own message: ${msg.id} (authorId=${msg.authorId} matches userUUID=${userUUID})`,
+                  );
+                  return false;
+                }
 
+                console.log(
+                  `[StrategyChat] Adding new message: ${msg.id} (authorId=${msg.authorId})`,
+                );
                 return true;
               })
               .map((msg: any) => {
@@ -266,39 +337,7 @@ export default function StrategyChat({ room, userEntity }: StrategyChatProps) {
       );
 
       // Convert wallet address to UUID (ElizaOS requires UUID for author_id)
-      // Use same method as backend: uuid.uuid5(NAMESPACE_DNS, "user:address")
-      const encoder = new TextEncoder();
-      const data = encoder.encode(`user:${userEntity}`);
-      const hashBuffer = await crypto.subtle.digest("SHA-1", data);
-      const hashArray = Array.from(new Uint8Array(hashBuffer));
-
-      // UUID v5 format: xxxxxxxx-xxxx-5xxx-yxxx-xxxxxxxxxxxx
-      hashArray[6] = (hashArray[6] & 0x0f) | 0x50; // Version 5
-      hashArray[8] = (hashArray[8] & 0x3f) | 0x80; // Variant
-
-      const author_uuid = [
-        hashArray
-          .slice(0, 4)
-          .map((b) => b.toString(16).padStart(2, "0"))
-          .join(""),
-        hashArray
-          .slice(4, 6)
-          .map((b) => b.toString(16).padStart(2, "0"))
-          .join(""),
-        hashArray
-          .slice(6, 8)
-          .map((b) => b.toString(16).padStart(2, "0"))
-          .join(""),
-        hashArray
-          .slice(8, 10)
-          .map((b) => b.toString(16).padStart(2, "0"))
-          .join(""),
-        hashArray
-          .slice(10, 16)
-          .map((b) => b.toString(16).padStart(2, "0"))
-          .join(""),
-      ].join("-");
-
+      const author_uuid = await convertWalletToUUID(userEntity);
       console.log("[StrategyChat] Converted author_id:", author_uuid);
 
       // Use REST API for sending messages (per ElizaOS OpenAPI spec)

@@ -144,7 +144,7 @@ function TradingDashboard({
           {/* Portfolio and Activity Grid */}
           <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
             <Portfolio data={portfolio} currentRoom={currentRoom} />
-            <ActivityFeed trades={trades} />
+            {/*<ActivityFeed trades={trades} />*/}
           </div>
         </div>
       </main>
